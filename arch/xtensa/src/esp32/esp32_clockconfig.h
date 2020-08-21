@@ -60,4 +60,8 @@
 
 void esp32_clockconfig(void);
 
+int /*IRAM_ATTR*/ esp_clk_cpu_freq(void);
+
+int /*IRAM_ATTR*/ esp_clk_apb_freq(void);
+
 #endif /* __ARCH_XTENSA_SRC_ESP32_ESP32_CLOCKCONFIG_H */

@@ -102,6 +102,9 @@
 #define XCHAL_FIRST_HIGHPRI_LEVEL       (XCHAL_NUM_LOWPRI_LEVELS+1)
                                                /* Level of first high-priority
                                                 * interrupt (always 2) */
+#define XTHAL_GET_CCOUNT()              ({ int __ccount; \
+                                        __asm__ __volatile__("rsr.ccount %0" : \
+                                        "=a"(__ccount)); __ccount; })
 
 /* Note:  1 <= LOWPRI_LEVELS <= EXCM_LEVEL < DEBUGLEVEL <= NUM_INTLEVELS < NMILEVEL <= 15 */
 
