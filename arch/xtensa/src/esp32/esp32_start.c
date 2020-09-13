@@ -43,6 +43,7 @@
 #include "esp32_clockconfig.h"
 #include "esp32_region.h"
 #include "esp32_start.h"
+#include "esp32_spiram.h"
 
 /****************************************************************************
  * Public Data
@@ -144,6 +145,13 @@ void IRAM_ATTR __start(void)
   /* Perform early serial initialization */
 
   xtensa_early_serial_initialize();
+#endif
+
+#if CONFIG_SPIRAM_BOOT_INIT
+  if (esp_spiram_init() != OK /*ESP_OK*/)
+    {
+      _err("Failed to init external RAM!\n");
+    }
 #endif
 
   /* Initialize onboard resources */

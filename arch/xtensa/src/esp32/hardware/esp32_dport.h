@@ -31,11 +31,19 @@
  * Included Files
  ****************************************************************************/
 
+#include "xtensa.h"
 #include "hardware/esp32_soc.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define DPORT_REG_GET_BIT(_r, _b)  (getreg32(_r) & (_b))
+#define DPORT_SET_PERI_REG_BITS(reg,bit_map,value,shift) putreg32((reg), \
+		                ((getreg32(reg)&(~((bit_map)<<(shift))))|\
+				(((value) & bit_map)<<(shift))))
+
+#define DPORT_GET_PERI_REG_BITS2(reg, mask,shift) ((getreg32(reg)>>(shift))&(mask))
 
 #define DPORT_PRO_BOOT_REMAP_CTRL_REG          (DR_REG_DPORT_BASE + 0x000)
 
