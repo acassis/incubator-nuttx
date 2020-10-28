@@ -666,6 +666,20 @@ config LM92_I2C_FREQUENCY
 	range 1 400000
 	depends on LM92
 
+config SENSORS_MAX30100
+	bool "Maxim MAX30100 Pulse Oximeter and Heart-Rate Sensor support"
+	default n
+	select I2C
+	---help---
+		Enable driver support for the Maxim MAX30100 Pulse
+		Oximeter and Heart-Rate Sensor
+
+config MAX30100_I2C_FREQUENCY
+	int "MAX30100 I2C frequency"
+	default 100000
+	range 1 400000
+	depends on SENSORS_MAX30100
+
 config SENSORS_SCD30
 	bool "Sensirion SCD30 CO2, humidity and temperature sensor"
 	default n
