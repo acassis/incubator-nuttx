@@ -465,6 +465,19 @@ int stm32_lpwaninitialize(void);
 #endif
 
 /****************************************************************************
+ * Name: stm32_max30100init
+ *
+ * Description:
+ *   Called to configure an I2C and to register MAX30100 for the
+ *   stm32f4discovery board.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_SENSORS_MAX30100
+int stm32_max30100init(FAR const char *devpath);
+#endif
+
+/****************************************************************************
  * Name: stm32_mmcsdinitialize
  *
  * Description:

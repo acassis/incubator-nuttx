@@ -245,6 +245,14 @@ int stm32_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_SENSORS_MAX30100
+  ret = board_max30100_initialize(0, 1);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: stm32_max30100init failed: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_RGBLED
   /* Configure the RGB LED driver */
 
