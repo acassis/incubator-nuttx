@@ -66,10 +66,10 @@ struct max30100_dev_s
 
 static int     max30100_write_reg(FAR struct max30100_dev_s *priv,
                                   FAR const uint8_t *buffer,
-                                  int buflen);
+                                  const uint8_t value);
 static int     max30100_read_reg(FAR struct max30100_dev_s *priv,
                                  FAR uint8_t *buffer,
-                                 int buflen);
+                                 FAR uint8_t *value);
 static int     max30100_readtemp(FAR struct max30100_dev_s *priv,
                                  FAR b16_t *temp);
 static uint8_t max30100_read_partid(FAR struct max30100_dev_s *priv);
@@ -162,7 +162,7 @@ static int max30100_read_reg(FAR struct max30100_dev_s *priv,
     {
       .frequency = CONFIG_MAX30100_I2C_FREQUENCY,
       .addr      = priv->addr,
-      .flags     = I2C_M_NOSTOP,
+      .flags     = 0,
       .buffer    = (FAR void *)reg,
       .length    = 1
     },
@@ -204,6 +204,7 @@ static int max30100_readtemp(FAR struct max30100_dev_s *priv, FAR b16_t *temp)
 
 static uint8_t max30100_read_partid(FAR struct max30100_dev_s *priv)
 {
+  int timeout = 0;
   int ret;
   uint8_t buffer;
   uint8_t value;
@@ -212,11 +213,19 @@ static uint8_t max30100_read_partid(FAR struct max30100_dev_s *priv)
 
   buffer = MAX30100_PART_ID;
 
-  ret = max30100_read_reg(priv, &buffer, &value);
-  if (ret < 0)
+  for (;;)
     {
-      snerr("ERROR: i2c_read failed: %d\n", ret);
-      return 0xff;
+      ret = max30100_read_reg(priv, &buffer, &value);
+      if (value == MAX30100_ID)
+        {
+          break;
+        }
+
+      if (++timeout > 1000)
+        {
+          snerr("Fail to read PART ID\n");
+	  break;
+        }
     }
 
   return value;
@@ -433,8 +442,9 @@ static int max30100_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         ret = -ENOTTY;
         break;
     }
-#endif
   return ret;
+#endif
+  return OK;
 }
 
 /****************************************************************************
@@ -478,9 +488,9 @@ int max30100_register(FAR const char *devpath, FAR struct i2c_master_s *i2c)
   priv->i2c              = i2c;
   priv->addr             = 0x57;
   priv->sensor_mode      = MODE_SPO2;
-  priv->spo2_sample_rate = SPO2_400SPS; /* 400 samples per sec */
-  priv->led_pw           = LED_PW_400US /* LED Pulse Width = 400uS */
-  priv->led_curr         = LED_11MA;    /* LED Current = 11mA */
+  priv->spo2_sample_rate = SPO2_400SPS;  /* 400 samples per sec */
+  priv->led_pw           = LED_PW_400US; /* LED Pulse Width = 400uS */
+  priv->led_curr         = LED_11MA;     /* LED Current = 11mA */
 
   /* Probe the device to confirm is exist */
 
