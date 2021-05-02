@@ -114,6 +114,10 @@ ifeq ($(CONFIG_LIS3DSH),y)
   CSRCS += stm32_lis3dsh.c
 endif
 
+ifeq ($(CONFIG_IOEXPANDER_MCP23X17),y)
+  CSRCS += stm32_mcp23x17.c
+endif
+
 DEPPATH += --dep-path src
 VPATH += :src
 CFLAGS += $(shell $(INCDIR) "$(CC)" $(TOPDIR)$(DELIM)arch$(DELIM)$(CONFIG_ARCH)$(DELIM)src$(DELIM)board$(DELIM)src)

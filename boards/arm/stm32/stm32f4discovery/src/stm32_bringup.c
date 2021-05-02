@@ -531,6 +531,15 @@ int stm32_bringup(void)
     }
 #endif /* CONFIG_LPWAN_SX127X */
 
+#ifdef CONFIG_IOEXPANDER_MCP23X17
+  ret = board_mcp23x17_initialize(1);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize MCP23x17 driver:"
+                      " %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_USBADB
   usbdev_adb_initialize();
 #endif

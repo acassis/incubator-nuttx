@@ -42,7 +42,7 @@ ARCHCFLAGS = -fno-builtin
 ARCHCXXFLAGS = -fno-builtin -fno-exceptions -fcheck-new
 ARCHWARNINGS = -Wall -Wstrict-prototypes -Wshadow -Wundef
 ARCHWARNINGSXX = -Wall -Wshadow -Wundef
-ARCHPICFLAGS = -fpic -msingle-pic-base -mpic-register=r10
+ARCHPICFLAGS = -fpic -msingle-pic-base -mpic-register=r10 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 ifeq ($(CONFIG_ARMV7M_TOOLCHAIN_CLANGL),y)
   ARCHCFLAGS += -nostdlib -ffreestanding
