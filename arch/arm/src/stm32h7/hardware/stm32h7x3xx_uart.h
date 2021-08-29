@@ -29,7 +29,9 @@
 #include "chip.h"
 #include "hardware/stm32_memorymap.h"
 
-#if defined(CONFIG_STM32H7_STM32H7X3XX) || defined(CONFIG_STM32H7_STM32H7X7XX)
+#if defined(CONFIG_STM32H7_STM32H7X3XX) || \
+    defined(CONFIG_STM32H7_STM32H7X5XX) || \
+    defined(CONFIG_STM32H7_STM32H7X7XX)
 
 /****************************************************************************
  * Pre-processor Definitions
