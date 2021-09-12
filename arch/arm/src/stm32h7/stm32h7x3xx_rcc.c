@@ -512,7 +512,11 @@ static inline void rcc_enableapb3(void)
 
   regval = getreg32(STM32_RCC_APB3ENR);
 
-  /* TODO: ... */
+#ifdef CONFIG_STM32H7_LTDC
+  /* LTDC clock enable */
+
+  regval |= RCC_APB3ENR_LTDCEN;
+#endif
 
   putreg32(regval, STM32_RCC_APB3ENR);   /* Enable peripherals */
 }
