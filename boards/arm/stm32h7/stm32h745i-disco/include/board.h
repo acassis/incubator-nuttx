@@ -394,6 +394,44 @@
 #define DMAMAP_SPI3_RX DMAMAP_DMA12_SPI3RX_0 /* DMA1 */
 #define DMAMAP_SPI3_TX DMAMAP_DMA12_SPI3TX_0 /* DMA1 */
 
+/* Ethernet */
+
+/* The STM32H7 connects to a LAN8740A PHY using these pins:
+ *
+ *   STM32H7  BOARD        LAN8740A
+ *   GPIO     SIGNAL       PIN NAME
+ *   -------- ------------ -------------
+ * - PA2      MII_MDIO     MDIO
+ * - PC1      MII_MDC      MDC
+ * - PH2      MII_CRS      CRS
+ * - PH3      MII_COL      COL/CRS_DV/MODE2
+ * - PI10     MII_RX_ER    RXER/RXD4/PHYAD0
+ * - PA1      MII_RX_CLK   RXCLK/PHYAD1
+ * - PC4      MII_RXD0     RXD0/MODE0
+ * - PC5      MII_RXD1     RXD1/MODE1
+ * - PB0      MII_RXD2     RXD2/nPME/RMIISE
+ * - PB1      MII_RXD3     RXD3/PHYAD2
+ * - PC3      MII_TX_CLK   TXCLK
+ * - PG13     MII_TXD0     TXD0
+ * - PG12     MII_TXD1     TXD1
+ * - PC2      MII_TXD2     TXD2
+ * - PE2      MII_TXD3     TXD3
+ * - PA7      MII_RX_DV    RXDV
+ * - PG11     MII_TX_EN    TXEN
+ * - PB2      nINT         nINT/TXER/TXD4
+ */
+
+#define GPIO_ETH_MII_CRS      GPIO_ETH_MII_CRS_2
+#define GPIO_ETH_MII_COL      GPIO_ETH_MII_COL_2
+#define GPIO_ETH_MII_RX_ER    GPIO_ETH_MII_RX_ER_2
+#define GPIO_ETH_MII_RXD2     GPIO_ETH_MII_RXD2_1
+#define GPIO_ETH_MII_RXD3     GPIO_ETH_MII_RXD3_1
+#define GPIO_ETH_MII_TX_EN    GPIO_ETH_MII_TX_EN_2
+#define GPIO_ETH_MII_TXD0     GPIO_ETH_MII_TXD0_2
+#define GPIO_ETH_MII_TXD1     GPIO_ETH_MII_TXD1_2
+#define GPIO_ETH_MII_TXD3     GPIO_ETH_MII_TXD3_2
+#define GPIO_ETH_RMII_TX_EN   GPIO_ETH_RMII_TX_EN_2
+
 /* LCD definitions */
 
 #define BOARD_LTDC_WIDTH                480
