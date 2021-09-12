@@ -128,17 +128,21 @@
 
 /* PLL3 */
 
-#define STM32_PLLCFG_PLL3CFG 0
-#define STM32_PLLCFG_PLL3M   0
-#define STM32_PLLCFG_PLL3N   0
-#define STM32_PLLCFG_PLL3P   0
-#define STM32_PLLCFG_PLL3Q   0
-#define STM32_PLLCFG_PLL3R   0
+#define STM32_PLLCFG_PLL3CFG     (RCC_PLLCFGR_PLL3VCOSEL_WIDE | \
+                                  RCC_PLLCFGR_PLL3RGE_4_8_MHZ | \
+                                  RCC_PLLCFGR_DIVP3EN | \
+                                  RCC_PLLCFGR_DIVQ3EN | \
+                                  RCC_PLLCFGR_DIVR3EN)
+#define STM32_PLLCFG_PLL3M       RCC_PLLCKSELR_DIVM3(1)
+#define STM32_PLLCFG_PLL3N       RCC_PLL3DIVR_N3(6)
+#define STM32_PLLCFG_PLL3P       RCC_PLL3DIVR_P3(2)
+#define STM32_PLLCFG_PLL3Q       RCC_PLL3DIVR_Q3(2)
+#define STM32_PLLCFG_PLL3R       RCC_PLL3DIVR_R3(3)
 
-#define STM32_VCO3_FREQUENCY
-#define STM32_PLL3P_FREQUENCY
-#define STM32_PLL3Q_FREQUENCY
-#define STM32_PLL3R_FREQUENCY
+#define STM32_VCO3_FREQUENCY     ((STM32_HSE_FREQUENCY / 1) * 6)
+#define STM32_PLL3P_FREQUENCY    (STM32_VCO3_FREQUENCY / 2)
+#define STM32_PLL3Q_FREQUENCY    (STM32_VCO3_FREQUENCY / 2)
+#define STM32_PLL3R_FREQUENCY    (STM32_VCO3_FREQUENCY / 3)
 
 /* SYSCLK = PLL1P = 400 MHz
  * CPUCLK = SYSCLK / 1 = 400 MHz
@@ -384,6 +388,74 @@
 
 #define DMAMAP_SPI3_RX DMAMAP_DMA12_SPI3RX_0 /* DMA1 */
 #define DMAMAP_SPI3_TX DMAMAP_DMA12_SPI3TX_0 /* DMA1 */
+
+/* LCD definitions */
+
+#define BOARD_LTDC_WIDTH                480
+#define BOARD_LTDC_HEIGHT               272
+
+#define BOARD_LTDC_OUTPUT_BPP           24
+#define BOARD_LTDC_HFP                  32
+#define BOARD_LTDC_HBP                  13
+#define BOARD_LTDC_VFP                  2
+#define BOARD_LTDC_VBP                  2
+#define BOARD_LTDC_HSYNC                41
+#define BOARD_LTDC_VSYNC                10
+
+#define BOARD_LTDC_PLLSAIN              192
+#define BOARD_LTDC_PLLSAIR              5
+
+/* Pixel Clock Polarity */
+
+#define BOARD_LTDC_GCR_PCPOL            0 /* !LTDC_GCR_PCPOL */
+
+/* Data Enable Polarity */
+
+#define BOARD_LTDC_GCR_DEPOL            0 /* !LTDC_GCR_DEPOL */
+
+/* Vertical Sync Polarity */
+
+#define BOARD_LTDC_GCR_VSPOL            0 /* !LTDC_GCR_VSPOL */
+
+/* Horizontal Sync Polarity */
+
+#define BOARD_LTDC_GCR_HSPOL            0 /* !LTDC_GCR_HSPOL */
+
+/* GPIO pinset */
+
+#define GPIO_LTDC_PINS                  24 /* 24-bit display */
+
+#define GPIO_LTDC_R0                    GPIO_LTDC_R0_3
+#define GPIO_LTDC_R1                    GPIO_LTDC_R1_3
+#define GPIO_LTDC_R2                    GPIO_LTDC_R2_4
+#define GPIO_LTDC_R3                    GPIO_LTDC_R3_3
+#define GPIO_LTDC_R4                    GPIO_LTDC_R4_4
+#define GPIO_LTDC_R5                    GPIO_LTDC_R5_4
+#define GPIO_LTDC_R6                    GPIO_LTDC_R6_4
+#define GPIO_LTDC_R7                    GPIO_LTDC_R7_3
+
+#define GPIO_LTDC_G0                    GPIO_LTDC_G0_2
+#define GPIO_LTDC_G1                    GPIO_LTDC_G1_2
+#define GPIO_LTDC_G2                    GPIO_LTDC_G2_3
+#define GPIO_LTDC_G3                    GPIO_LTDC_G3_4
+#define GPIO_LTDC_G4                    GPIO_LTDC_G4_3
+#define GPIO_LTDC_G5                    GPIO_LTDC_G5_3
+#define GPIO_LTDC_G6                    GPIO_LTDC_G6_3
+#define GPIO_LTDC_G7                    GPIO_LTDC_G7_3
+
+#define GPIO_LTDC_B0                    GPIO_LTDC_B0_1
+#define GPIO_LTDC_B1                    GPIO_LTDC_B1_2
+#define GPIO_LTDC_B2                    GPIO_LTDC_B2_3
+#define GPIO_LTDC_B3                    GPIO_LTDC_B3_3
+#define GPIO_LTDC_B4                    GPIO_LTDC_B4_4
+#define GPIO_LTDC_B5                    GPIO_LTDC_B5_3
+#define GPIO_LTDC_B6                    GPIO_LTDC_B6_3
+#define GPIO_LTDC_B7                    GPIO_LTDC_B7_3
+
+#define GPIO_LTDC_VSYNC                 GPIO_LTDC_VSYNC_3
+#define GPIO_LTDC_HSYNC                 GPIO_LTDC_HSYNC_3
+#define GPIO_LTDC_DE                    GPIO_LTDC_DE_3
+#define GPIO_LTDC_CLK                   GPIO_LTDC_CLK_3
 
 /****************************************************************************
  * Public Data

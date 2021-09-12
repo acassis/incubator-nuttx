@@ -37,6 +37,10 @@
 #include "stm32_usbhost.h"
 #endif
 
+#ifdef CONFIG_VIDEO_FB
+#  include <nuttx/video/fb.h>
+#endif
+
 #include "stm32h745i_disco.h"
 
 /****************************************************************************
@@ -81,6 +85,16 @@ int stm32_bringup(void)
              "ERROR: Failed to mount the PROC filesystem: %d\n",  ret);
     }
 #endif /* CONFIG_FS_PROCFS */
+
+#ifdef CONFIG_VIDEO_FB
+  /* Initialize and register the framebuffer driver */
+
+  ret = fb_register(0, 0);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: fb_register() failed: %d\n", ret);
+    }
+#endif
 
 #if !defined(CONFIG_ARCH_LEDS) && defined(CONFIG_USERLED_LOWER)
   /* Register the LED driver */

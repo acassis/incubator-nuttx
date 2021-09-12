@@ -101,6 +101,14 @@
                            GPIO_PUSHPULL|GPIO_PORTG|GPIO_PIN7)
 #endif
 
+/* LCD */
+
+#define GPIO_LCD_DISP      (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+                            GPIO_OUTPUT_SET|GPIO_PORTD|GPIO_PIN7)
+
+#define GPIO_LCD_BL        (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+                            GPIO_OUTPUT_SET|GPIO_PORTK|GPIO_PIN0)
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/

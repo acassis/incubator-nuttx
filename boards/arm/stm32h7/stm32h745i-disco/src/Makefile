@@ -44,4 +44,8 @@ ifeq ($(CONFIG_BOARDCTL_RESET),y)
 CSRCS += stm32_reset.c
 endif
 
+ifeq ($(CONFIG_STM32H7_LTDC),y)
+CSRCS += stm32_lcd.c
+endif
+
 include $(TOPDIR)/boards/Board.mk
