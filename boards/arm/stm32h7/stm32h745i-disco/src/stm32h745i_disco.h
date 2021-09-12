@@ -101,6 +101,27 @@
                            GPIO_PUSHPULL|GPIO_PORTG|GPIO_PIN7)
 #endif
 
+/* Touchscreen definitions **************************************************/
+
+/* The STM32H743I-DISCO have connectors for the LCD model RK043FN48H-CT672B.
+ * It comes with the FT5336GQQ (FT5X06) touchscreen chip integrated.
+ * FT5X06 is connected to the I2C4 bus.
+ */
+
+/* I2C4 address of the FT5336GQQ touchscreen chip */
+
+#define FT5X06_I2C_ADDRESS  0x38
+
+/* Touchscreen Interrupt line: PG2 */
+
+#define GPIO_FT5X06_INT    (GPIO_INPUT|GPIO_FLOAT|GPIO_SPEED_100MHz| \
+                            GPIO_PUSHPULL|GPIO_PORTG|GPIO_PIN2)
+
+/* The reset line is active low: PB12 */
+
+#define GPIO_FT5X06_RST    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+                            GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN12)
+
 /* LCD */
 
 #define GPIO_LCD_DISP      (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\

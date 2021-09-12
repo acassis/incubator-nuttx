@@ -367,6 +367,11 @@
 #define GPIO_I2C2_SDA  GPIO_I2C2_SDA_2  /* PF0 - D68 */
 #define GPIO_I2C2_SMBA GPIO_I2C2_SMBA_2 /* PF2 - D70 */
 
+/* I2C4 - Used by Touchscreen and Audio Codec */
+
+#define GPIO_I2C4_SCL  GPIO_I2C4_SCL_1  /* PD12 */
+#define GPIO_I2C4_SDA  GPIO_I2C4_SDA_1  /* PD13 */
+
 /* SPI3 */
 
 #define GPIO_SPI3_MISO GPIO_SPI3_MISO_1 /* PB4 */
