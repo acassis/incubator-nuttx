@@ -62,6 +62,10 @@
 #  include "esp32_board_wdt.h"
 #endif
 
+#ifdef CONFIG_ESP32_BLE
+#  include "esp32_ble.h"
+#endif
+
 #ifdef CONFIG_ESP32_WIRELESS
 #  include "esp32_board_wlan.h"
 #endif
@@ -210,14 +214,23 @@ int esp32_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESP32_BLE
+  ret = esp32_ble_initialize();
+  if (ret)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize BLE\n");
+      return ret;
+    }
+#endif
+
 #ifdef CONFIG_ESP32_WIRELESS
-  ret = board_wlan_init();
+  /*ret = board_wlan_init();
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize wireless subsystem=%d\n",
              ret);
       return ret;
-    }
+    }*/
 #endif
 
 /* First, register the timer drivers and let timer 1 for oneshot
