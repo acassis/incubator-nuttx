@@ -3905,7 +3905,11 @@ static void esp_wifi_delete_queue(void *queue)
 
 static int wifi_coex_init(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_init();
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -3918,6 +3922,9 @@ static int wifi_coex_init(void)
 
 static void wifi_coex_deinit(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_deinit();
+#endif
 }
 
 /****************************************************************************
@@ -3930,7 +3937,12 @@ static void wifi_coex_deinit(void)
 
 static int wifi_coex_enable(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_enable();
+#else
   return 0;
+#endif
+
 }
 
 /****************************************************************************
@@ -3943,6 +3955,9 @@ static int wifi_coex_enable(void)
 
 static void wifi_coex_disable(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_disable();
+#endif
 }
 
 /****************************************************************************
@@ -3955,7 +3970,11 @@ static void wifi_coex_disable(void)
 
 static uint32_t esp_coex_status_get(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_status_get();
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -3968,6 +3987,9 @@ static uint32_t esp_coex_status_get(void)
 
 static void esp_coex_condition_set(uint32_t type, bool dissatisfy)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_condition_set(type, dissatisfy);
+#endif
 }
 
 /****************************************************************************
@@ -3981,7 +4003,11 @@ static void esp_coex_condition_set(uint32_t type, bool dissatisfy)
 static int32_t esp_coex_wifi_request(uint32_t event, uint32_t latency,
                                      uint32_t duration)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_wifi_request(event, latency, duration);
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -3994,7 +4020,11 @@ static int32_t esp_coex_wifi_request(uint32_t event, uint32_t latency,
 
 static int32_t esp_coex_wifi_release(uint32_t event)
 {
-  return 0;
+#if defined(CONFIG_SW_COEXIST_ENABLE)
+    return coex_wifi_release(event);
+#else
+    return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4007,7 +4037,11 @@ static int32_t esp_coex_wifi_release(uint32_t event)
 
 static int wifi_coex_wifi_set_channel(uint8_t primary, uint8_t secondary)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_wifi_channel_set(primary, secondary);
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4020,7 +4054,11 @@ static int wifi_coex_wifi_set_channel(uint8_t primary, uint8_t secondary)
 
 static int wifi_coex_get_event_duration(uint32_t event, uint32_t *duration)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_event_duration_get(event, duration);
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4046,6 +4084,9 @@ static int wifi_coex_get_pti(uint32_t event, uint8_t *pti)
 
 static void wifi_coex_clear_schm_status_bit(uint32_t type, uint32_t status)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_schm_status_bit_clear(type, status);
+#endif
 }
 
 /****************************************************************************
@@ -4058,6 +4099,9 @@ static void wifi_coex_clear_schm_status_bit(uint32_t type, uint32_t status)
 
 static void wifi_coex_set_schm_status_bit(uint32_t type, uint32_t status)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_schm_status_bit_set(type, status);
+#endif
 }
 
 /****************************************************************************
@@ -4070,7 +4114,11 @@ static void wifi_coex_set_schm_status_bit(uint32_t type, uint32_t status)
 
 static int wifi_coex_set_schm_interval(uint32_t interval)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_interval_set(interval);
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4083,7 +4131,11 @@ static int wifi_coex_set_schm_interval(uint32_t interval)
 
 static uint32_t wifi_coex_get_schm_interval(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_interval_get();
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4096,7 +4148,11 @@ static uint32_t wifi_coex_get_schm_interval(void)
 
 static uint8_t wifi_coex_get_schm_curr_period(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_curr_period_get();
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4109,7 +4165,11 @@ static uint8_t wifi_coex_get_schm_curr_period(void)
 
 static void *wifi_coex_get_schm_curr_phase(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_curr_phase_get();
+#else
   return NULL;
+#endif
 }
 
 /****************************************************************************
@@ -4122,7 +4182,11 @@ static void *wifi_coex_get_schm_curr_phase(void)
 
 static int wifi_coex_set_schm_curr_phase_idx(int idx)
 {
-  return -1;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_curr_phase_idx_set(idx);
+#else
+  return 0;
+#endif
 }
 
 /****************************************************************************
@@ -4135,7 +4199,11 @@ static int wifi_coex_set_schm_curr_phase_idx(int idx)
 
 static int wifi_coex_get_schm_curr_phase_idx(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_curr_phase_idx_get();
+#else
   return 0;
+#endif
 }
 
 /****************************************************************************

@@ -627,7 +627,11 @@ static btdm_dram_available_region_t btdm_dram_available_region[] =
 
 static int adapter_coex_register_bt_cb_wrapper(coex_func_cb_t cb)
 {
-  return ESP_ERR_INVALID_STATE;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_register_bt_cb(cb);
+#else
+  return 0;
+#endif
 }
 
 static int adapter_coex_schm_register_btdm_callback(void *callback)
@@ -2202,9 +2206,6 @@ static void bt_phy_enable(void)
       bt_phy_enable_clock();
       phy_set_wifi_mode_only(0);
       register_chipv7_phy(&phy_init_data, cal_data, PHY_RF_CAL_NONE);
-#ifdef CONFIG_ESP32_WIFI_BT_COEXIST
-      coex_pti_v2();
-#endif
     }
 
   g_phy_access_ref++;
@@ -2933,21 +2934,36 @@ int coex_bt_request_wrapper(uint32_t event,
                             uint32_t latency,
                             uint32_t duration)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_bt_request(event, latency, duration);
+#else
   return 0;
+#endif
 }
 
 int coex_bt_release_wrapper(uint32_t event)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_bt_release(event);
+#else
   return 0;
+#endif
+
 }
 
 uint32_t coex_bb_reset_lock_wrapper(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_bb_reset_lock();
+#else
   return 0;
+#endif
 }
 
 void coex_bb_reset_unlock_wrapper(uint32_t restore)
 {
-  return;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_bb_reset_unlock(restore);
+#endif
 }
 
