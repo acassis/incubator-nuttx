@@ -108,10 +108,6 @@ do {\
 
 extern void btdm_controller_set_sleep_mode(uint8_t mode);
 
-#ifdef CONFIG_ESP32_WIFI_BT_COEXIST
-extern void coex_pti_v2(void);
-#endif
-
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -636,42 +632,73 @@ static int adapter_coex_register_bt_cb_wrapper(coex_func_cb_t cb)
 
 static int adapter_coex_schm_register_btdm_callback(void *callback)
 {
-  return ESP_ERR_INVALID_STATE;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_register_btdm_callback(callback);
+#else
+  return 0;
+#endif
+
 }
 
 static int adapter_coex_register_wifi_channel_change_callback(void *cb)
 {
-  return ESP_ERR_INVALID_STATE;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_register_wifi_channel_change_callback(cb);
+#else
+  return -1;
+#endif
 }
 
 static int adapter_coex_wifi_channel_get(uint8_t *primary,
                                          uint8_t *secondary)
 {
-  return -ERROR;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_wifi_channel_get(primary, secondary);
+#else
+  return -1;
+#endif
 }
 
 static void adapter_coex_schm_status_bit_clear(uint32_t type,
                                                uint32_t status)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_schm_status_bit_clear(type, status);
+#endif
 }
 
 static void adapter_coex_schm_status_bit_set(uint32_t type, uint32_t status)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  coex_schm_status_bit_set(type, status);
+#endif
 }
 
 static uint32_t adapter_coex_schm_interval_get(void)
 {
-  return ESP_ERR_INVALID_STATE;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+    return coex_schm_interval_get();
+#else
+    return 0;
+#endif
 }
 
 static uint8_t adapter_coex_schm_curr_period_get(void)
 {
-  return OK;
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+    return coex_schm_interval_get();
+#else
+    return 0;
+#endif
 }
 
 static void *adapter_coex_schm_curr_phase_get(void)
 {
+#if defined(CONFIG_ESP32_WIFI_BT_COEXIST)
+  return coex_schm_curr_phase_get();
+#else
   return NULL;
+#endif
 }
 
 /****************************************************************************
