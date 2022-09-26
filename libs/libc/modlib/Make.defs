@@ -28,6 +28,8 @@ CSRCS += modlib_read.c modlib_registry.c modlib_sections.c
 CSRCS += modlib_symbols.c modlib_symtab.c modlib_uninit.c modlib_unload.c
 CSRCS += modlib_verify.c
 
+ASRCS += modlib_globals.S
+
 # Add the modlib directory to the build
 
 DEPPATH += --dep-path modlib
