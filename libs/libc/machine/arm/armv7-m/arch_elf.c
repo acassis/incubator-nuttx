@@ -497,8 +497,8 @@ int up_relocate(const Elf32_Rel *rel, const Elf32_Sym *sym, uintptr_t addr)
     case R_ARM_RELATIVE :
     case R_ARM_JUMP_SLOT :
       {
-        binfo("Relocating: RELATIVE/JUMP_SLOT at %p value: %08x with %08x\n",
-              addr,*(uint32_t *) addr, (uint32_t) sym->st_value);
+        binfo("Relocating: RELATIVE/JUMP_SLOT at %p value: %08lx with %08lx\n",
+              (void *)addr,*(uint32_t *) addr, (uint32_t) sym->st_value);
         *(uint32_t *) addr = (uint32_t) sym->st_value;
       }
       break;

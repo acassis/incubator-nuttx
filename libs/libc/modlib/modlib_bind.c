@@ -257,7 +257,7 @@ static int modlib_relocate(FAR struct module_s *modp,
 
           /* Get the value of the symbol (in sym.st_value) */
 
-          ret = modlib_symvalue(modp, loadinfo, sym);
+          ret = modlib_symvalue(modp, loadinfo, sym, loadinfo->shdr[loadinfo->strtabidx].sh_offset);
           if (ret < 0)
             {
               /* The special error -ESRCH is returned only in one condition:
@@ -432,7 +432,7 @@ static int modlib_relocateadd(FAR struct module_s *modp,
 
           /* Read the symbol table entry into memory */
 
-          ret = modlib_readsym(loadinfo, symidx, sym);
+          ret = modlib_readsym(loadinfo, symidx, sym, &loadinfo->shdr[loadinfo->symtabidx]);
           if (ret < 0)
             {
               berr("ERROR: Section %d reloc %d: "
@@ -444,7 +444,7 @@ static int modlib_relocateadd(FAR struct module_s *modp,
 
           /* Get the value of the symbol (in sym.st_value) */
 
-          ret = modlib_symvalue(modp, loadinfo, sym);
+          ret = modlib_symvalue(modp, loadinfo, sym, loadinfo->shdr[loadinfo->strtabidx].sh_offset);
           if (ret < 0)
             {
               /* The special error -ESRCH is returned only in one condition:
@@ -656,7 +656,7 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
 
           if (rel->r_offset < 0)
             {
-              berr("ERROR: Section %d reloc %d: Relocation address out of range, offset %d\n",
+              berr("ERROR: Section %d reloc %d: Relocation address out of range, offset %ld\n",
                    relidx, i, rel->r_offset);
               ret = -EINVAL;
               lib_free(sym);

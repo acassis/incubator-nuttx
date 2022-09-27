@@ -1,5 +1,5 @@
 /****************************************************************************
- * libs/libc/modlib/modlib_loadshdrs.c
+ * libs/libc/modlib/modlib_loadhdrs.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -53,7 +53,7 @@
  *
  ****************************************************************************/
 
-int modlib_loadshdrs(FAR struct mod_loadinfo_s *loadinfo)
+int modlib_loadhdrs(FAR struct mod_loadinfo_s *loadinfo)
 {
   size_t shdrsize, phdrsize;
   int ret;

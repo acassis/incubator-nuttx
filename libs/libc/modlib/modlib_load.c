@@ -96,7 +96,7 @@ static void modlib_elfsize(struct mod_loadinfo_s *loadinfo)
 	  if (phdr->p_flags & PF_X) 
             {
 	      textsize += phdr->p_memsz;
-	      textaddr = phdr->p_vaddr;
+	      textaddr = (void *) phdr->p_vaddr;
             }
 	  else
             {
@@ -130,14 +130,14 @@ static inline int modlib_loadfile(FAR struct mod_loadinfo_s *loadinfo)
 {
   FAR uint8_t *text;
   FAR uint8_t *data;
-  FAR uint8_t **pptr;
   int ret;
   int i;
 
   /* Read each PT_LOAD area into memory */
 
   binfo("Loading sections - text: %p.%x data: %p.%x\n",
-        loadinfo->textalloc,loadinfo->textsize,loadinfo->datastart,loadinfo->datasize);
+        (void *)loadinfo->textalloc,loadinfo->textsize,
+	(void *)loadinfo->datastart,loadinfo->datasize);
   text = (FAR uint8_t *)loadinfo->textalloc;
   data = (FAR uint8_t *)loadinfo->datastart;
 
