@@ -216,9 +216,11 @@
 #define PT_PHDR            6
 
 /* Processor specific values for the Phdr p_type field.  */
+
 #define PT_ARM_EXIDX            (PT_LOPROC + 1) /* ARM unwind segment.  */
 
 /* GCC specific */
+
 #define PT_GNU_EH_FRAME 0x6474e550      /* GCC exception handler frame */
 #define PT_GNU_STACK    0x6474e551      /* Stack executability */
 #define PT_GNU_RELRO    0x6474e552      /* Read-only after relocation */

@@ -148,7 +148,9 @@ static inline int modlib_loadfile(FAR struct mod_loadinfo_s *loadinfo)
       if (phdr->p_type == PT_LOAD)
         {
           if (phdr->p_flags & PF_X)
+	    {
               ret = modlib_read(loadinfo, text, phdr->p_filesz, phdr->p_offset);
+	    }
           else 
 	    {
 	      int bssSize = phdr->p_memsz - phdr->p_filesz;

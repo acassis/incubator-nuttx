@@ -56,10 +56,10 @@ struct mod_exportinfo_s
   FAR const struct symtab_s *symbol; /* Symbol info returned (if found) */
 };
 
-typedef struct {
+struct epTable_s {
 	uint8_t	*epName;	/* Name of global symbol */
 	void	*epAddr;	/* Address of global symbol */
-} epTable_t;
+};
 
 /****************************************************************************
  * Private Functions
@@ -465,6 +465,7 @@ int modlib_insertsymtab(FAR struct module_s *modp,
   
 
   /* Count the "live" symbols */
+
   nSym = shdr->sh_size / sizeof(Elf32_Sym);
   for (i = 0, symCount = 0; i < nSym; i++)
     {
@@ -520,8 +521,8 @@ int modlib_insertsymtab(FAR struct module_s *modp,
  ****************************************************************************/
 static int findEP(const void *c1, const void *c2)
 {
-  const epTable_t *m1 = (epTable_t *) c1;
-  const epTable_t *m2 = (epTable_t *) c2;
+  const struct epTable_s *m1 = (struct epTable_s *) c1;
+  const struct epTable_s *m2 = (struct epTable_s *) c2;
   return strcmp((FAR const char *)m1->epName, (FAR const char *)m2->epName);
 }
 
@@ -542,8 +543,8 @@ void *modlib_findglobal(FAR struct module_s *modp,
 {
   FAR Elf32_Shdr *strTab = &loadinfo->shdr[shdr->sh_link];
   int ret;
-  epTable_t key, *res;
-  extern epTable_t globalTable[];
+  struct epTable_s key, *res;
+  extern struct epTable_s globalTable[];
   extern int nGlobals;
 
   ret = modlib_symname(loadinfo, sym, strTab->sh_offset);
@@ -551,11 +552,15 @@ void *modlib_findglobal(FAR struct module_s *modp,
       return NULL;
 
   key.epName = loadinfo->iobuffer;
-  res = bsearch(&key, globalTable, nGlobals, sizeof(epTable_t), findEP);
+  res = bsearch(&key, globalTable, nGlobals, sizeof(struct epTable_s), findEP);
   if (res != NULL)
-     return res->epAddr;
+    {
+      return res->epAddr;
+    }
   else
-     return NULL;
+    {
+      return NULL;
+    }
 }
 
 /****************************************************************************
@@ -576,7 +581,9 @@ void modlib_freesymtab(FAR struct module_s *modp)
   if ((symbol = modp->modinfo.exports))
     {
       for (int i = 0; i < modp->modinfo.nexports; i++)
+        {
           lib_free((FAR void *) symbol[i].sym_name);
+        }
       lib_free((FAR void *) symbol);
     }
 }

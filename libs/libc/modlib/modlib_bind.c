@@ -51,6 +51,18 @@ typedef struct
   int             idx;
 } Elf_SymCache;
 
+struct {
+	int	strOff;		/* Offset to string table */
+	int	symOff;		/* Offset to symbol table */
+	int	lSymTab;	/* Size of symbol table */
+	int	relEntSz;	/* Size of relocation entry */
+  	int	relOff[2];	/* Offset to the relocation section */
+	int	relSz[2];	/* Size of relocation table */
+#define I_REL	0		/* Index into relxxx[] arrays for relocations */
+#define I_PLT	1		/* ... for PLTs */
+#define N_RELS	2		/* Number of relxxx[] indexes */
+} relData;
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -543,17 +555,6 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
   uintptr_t       addr;
   int             ret;
   int             i, iRel, iSym;
-  struct {
-	int	strOff;		/* Offset to string table */
-	int	symOff;		/* Offset to symbol table */
-	int	lSymTab;	/* Size of symbol table */
-	int	relEntSz;	/* Size of relocation entry */
-  	int	relOff[2];	/* Offset to the relocation section */
-	int	relSz[2];	/* Size of relocation table */
-#define I_REL	0
-#define I_PLT	1
-#define N_RELS	2
-  } relData;
 
   dyn = lib_malloc(shdr->sh_size);
   ret = modlib_read(loadinfo, (FAR uint8_t *) dyn, shdr->sh_size, shdr->sh_offset);
@@ -628,8 +629,7 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
       if (relData.relOff[iRel] == 0)
           continue;
 
-      /* Examine each relocation in the .rel.* section.
-       */
+      /* Examine each relocation in the .rel.* section. */
 
       ret = OK;
 
@@ -718,6 +718,7 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
    */
 
   /* Relocate the entries in the table */
+
   for (i = 0; i < (symhdr->sh_size / sizeof(Elf32_Sym)); i++)
     {
       Elf32_Shdr *s = &loadinfo->shdr[sym[i].st_shndx];
@@ -818,7 +819,9 @@ int modlib_bind(FAR struct module_s *modp,
            */
 
           if ((loadinfo->shdr[i].sh_flags & SHF_ALLOC) == 0)
+            {
                 continue;
+            }
 
           /* Process the relocations by type */
 
