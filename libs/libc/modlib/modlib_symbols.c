@@ -56,9 +56,10 @@ struct mod_exportinfo_s
   FAR const struct symtab_s *symbol; /* Symbol info returned (if found) */
 };
 
-struct epTable_s {
-	uint8_t	*epName;	/* Name of global symbol */
-	void	*epAddr;	/* Address of global symbol */
+struct epTable_s
+{
+  uint8_t *epName;      /* Name of global symbol */
+  void    *epAddr;      /* Address of global symbol */
 };
 
 /****************************************************************************
@@ -151,6 +152,7 @@ static int modlib_symname(FAR struct mod_loadinfo_s *loadinfo,
           berr("ERROR: mod_reallocbuffer failed: %d\n", ret);
           return ret;
         }
+
       offset += CONFIG_MODLIB_BUFFERINCR;
     }
 
@@ -313,7 +315,7 @@ int modlib_readsym(FAR struct mod_loadinfo_s *loadinfo, int index,
 
 int modlib_symvalue(FAR struct module_s *modp,
                     FAR struct mod_loadinfo_s *loadinfo, FAR Elf_Sym *sym,
- 		    Elf32_Off sh_offset)
+                    Elf32_Off sh_offset)
 {
   FAR const struct symtab_s *symbol;
   struct mod_exportinfo_s exportinfo;
@@ -415,7 +417,7 @@ int modlib_symvalue(FAR struct module_s *modp,
         secbase = loadinfo->shdr[sym->st_shndx].sh_addr;
 
         binfo("Other[%d]: %08" PRIxPTR "+%08" PRIxPTR "=%08" PRIxPTR "\n",
-	      sym->st_shndx,
+              sym->st_shndx,
               (uintptr_t)sym->st_value, secbase,
               (uintptr_t)(sym->st_value + secbase));
 
@@ -443,26 +445,28 @@ int modlib_symvalue(FAR struct module_s *modp,
  *   0 (OK) is returned on success and a negated errno is returned on
  *   failure.
  *
- *   EINVAL - There is something inconsistent in the symbol table (should only
- *            happen if the file is corrupted).
+ *   EINVAL - There is something inconsistent in the symbol table
+ *            (should only happen if the file is corrupted).
  *
  ****************************************************************************/
 
-int modlib_insertsymtab(FAR struct module_s *modp, 
-			struct mod_loadinfo_s *loadinfo, 
-			FAR Elf32_Shdr *shdr, FAR Elf32_Sym *sym)
+int modlib_insertsymtab(FAR struct module_s *modp,
+                        struct mod_loadinfo_s *loadinfo,
+                        FAR Elf32_Shdr *shdr, FAR Elf32_Sym *sym)
 {
   FAR struct symtab_s *symbol;
   FAR Elf32_Shdr *strTab = &loadinfo->shdr[shdr->sh_link];
-  int ret = 0, i, j;
-  int nSym, symCount;
+  int ret = 0;
+  int i;
+  int j;
+  int nSym;
+  int symCount;
 
   if (modp->modinfo.exports != NULL)
     {
       bwarn("Module export information already present - replacing");
       modlib_freesymtab((FAR void *) modp);
     }
-  
 
   /* Count the "live" symbols */
 
@@ -475,17 +479,20 @@ int modlib_insertsymtab(FAR struct module_s *modp,
 
   if (symCount > 0)
     {
-      modp->modinfo.exports = symbol = loadinfo->exported = lib_malloc(sizeof(*symbol) * symCount);
+      modp->modinfo.exports = symbol =
+                              loadinfo->exported =
+                              lib_malloc(sizeof(*symbol) * symCount);
       if (modp->modinfo.exports)
-        { 
+        {
           /* Build out module's symbol table */
+
           modp->modinfo.nexports = symCount;
           for (i = 0, j = 0; i < nSym; i++)
             {
-	      if (sym[i].st_name != 0)
+              if (sym[i].st_name != 0)
                 {
                   ret = modlib_symname(loadinfo, &sym[i], strTab->sh_offset);
-                  if (ret < 0) 
+                  if (ret < 0)
                     {
                       lib_free((FAR void *) modp->modinfo.exports);
                       modp->modinfo.exports = NULL;
@@ -501,7 +508,7 @@ int modlib_insertsymtab(FAR struct module_s *modp,
       else
         {
           berr("Unable to get memory for exported symbols table");
-          ret = -ENOMEM;  
+          ret = -ENOMEM;
         }
     }
 
@@ -519,6 +526,7 @@ int modlib_insertsymtab(FAR struct module_s *modp,
  *   c2 - Comparand 2
  *
  ****************************************************************************/
+
 static int findEP(const void *c1, const void *c2)
 {
   const struct epTable_s *m1 = (struct epTable_s *) c1;
@@ -538,12 +546,13 @@ static int findEP(const void *c1, const void *c2)
  ****************************************************************************/
 
 void *modlib_findglobal(FAR struct module_s *modp,
-                        struct mod_loadinfo_s *loadinfo, 
+                        struct mod_loadinfo_s *loadinfo,
                         FAR Elf32_Shdr *shdr, FAR Elf32_Sym *sym)
 {
   FAR Elf32_Shdr *strTab = &loadinfo->shdr[shdr->sh_link];
   int ret;
-  struct epTable_s key, *res;
+  struct epTable_s key;
+  struct epTalbe_s *res;
   extern struct epTable_s globalTable[];
   extern int nGlobals;
 
@@ -552,7 +561,8 @@ void *modlib_findglobal(FAR struct module_s *modp,
       return NULL;
 
   key.epName = loadinfo->iobuffer;
-  res = bsearch(&key, globalTable, nGlobals, sizeof(struct epTable_s), findEP);
+  res = bsearch(&key, globalTable, nGlobals,
+                sizeof(struct epTable_s), findEP);
   if (res != NULL)
     {
       return res->epAddr;
@@ -584,6 +594,7 @@ void modlib_freesymtab(FAR struct module_s *modp)
         {
           lib_free((FAR void *) symbol[i].sym_name);
         }
+
       lib_free((FAR void *) symbol);
     }
 }

@@ -55,7 +55,8 @@
 
 int modlib_loadhdrs(FAR struct mod_loadinfo_s *loadinfo)
 {
-  size_t shdrsize, phdrsize;
+  size_t shdrsize;
+  size_t phdrsize;
   int ret;
 
   DEBUGASSERT(loadinfo->shdr == NULL);
@@ -89,7 +90,8 @@ int modlib_loadhdrs(FAR struct mod_loadinfo_s *loadinfo)
 
   /* Get the total size of the program header table */
 
-  phdrsize = (size_t)loadinfo->ehdr.e_phentsize * (size_t)loadinfo->ehdr.e_phnum;
+  phdrsize = (size_t)loadinfo->ehdr.e_phentsize *
+             (size_t)loadinfo->ehdr.e_phnum;
   if (loadinfo->ehdr.e_phoff + phdrsize > loadinfo->filelen)
     {
       berr("ERROR: Insufficent space in file for program header table\n");

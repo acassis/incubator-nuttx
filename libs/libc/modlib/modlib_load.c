@@ -92,19 +92,20 @@ static void modlib_elfsize(struct mod_loadinfo_s *loadinfo)
       FAR void *textaddr = NULL;
 
       if (phdr->p_type == PT_LOAD)
-	{
-	  if (phdr->p_flags & PF_X) 
+        {
+          if (phdr->p_flags & PF_X)
             {
-	      textsize += phdr->p_memsz;
-	      textaddr = (void *) phdr->p_vaddr;
+              textsize += phdr->p_memsz;
+              textaddr = (void *) phdr->p_vaddr;
             }
-	  else
+          else
             {
-	      datasize += phdr->p_memsz;
+              datasize += phdr->p_memsz;
               loadinfo->datasec = phdr->p_vaddr;
-              loadinfo->segpad  = phdr->p_vaddr - ((uintptr_t) textaddr + textsize);
+              loadinfo->segpad  = phdr->p_vaddr -
+                                  ((uintptr_t) textaddr + textsize);
             }
-	}
+        }
     }
 
   /* Save the allocation size */
@@ -136,8 +137,8 @@ static inline int modlib_loadfile(FAR struct mod_loadinfo_s *loadinfo)
   /* Read each PT_LOAD area into memory */
 
   binfo("Loading sections - text: %p.%x data: %p.%x\n",
-        (void *)loadinfo->textalloc,loadinfo->textsize,
-	(void *)loadinfo->datastart,loadinfo->datasize);
+        (void *)loadinfo->textalloc, loadinfo->textsize,
+        (void *)loadinfo->datastart, loadinfo->datasize);
   text = (FAR uint8_t *)loadinfo->textalloc;
   data = (FAR uint8_t *)loadinfo->datastart;
 
@@ -148,15 +149,19 @@ static inline int modlib_loadfile(FAR struct mod_loadinfo_s *loadinfo)
       if (phdr->p_type == PT_LOAD)
         {
           if (phdr->p_flags & PF_X)
-	    {
-              ret = modlib_read(loadinfo, text, phdr->p_filesz, phdr->p_offset);
-	    }
-          else 
-	    {
-	      int bssSize = phdr->p_memsz - phdr->p_filesz;
-              ret = modlib_read(loadinfo, data, phdr->p_filesz, phdr->p_offset);
-	      memset((FAR void *)((uintptr_t) data + phdr->p_filesz), 0, bssSize);
-	    }
+            {
+              ret = modlib_read(loadinfo, text, phdr->p_filesz,
+                                phdr->p_offset);
+            }
+          else
+            {
+              int bssSize = phdr->p_memsz - phdr->p_filesz;
+              ret = modlib_read(loadinfo, data, phdr->p_filesz,
+                                phdr->p_offset);
+              memset((FAR void *)((uintptr_t) data + phdr->p_filesz), 0,
+                     bssSize);
+            }
+
           if (ret < 0)
             {
               berr("ERROR: Failed to read section %d: %d\n", i, ret);
@@ -214,14 +219,14 @@ int modlib_load(FAR struct mod_loadinfo_s *loadinfo)
 #if defined(CONFIG_ARCH_USE_TEXT_HEAP)
       loadinfo->textalloc = (uintptr_t)
                             up_textheap_memalign(loadinfo->textalign,
-                                                 loadinfo->textsize + 
-						 loadinfo->datasize + 
-						 loadinfo->segpad);
+                                                 loadinfo->textsize +
+                                                 loadinfo->datasize +
+                                                 loadinfo->segpad);
 #else
       loadinfo->textalloc = (uintptr_t)lib_memalign(loadinfo->textalign,
-                                                    loadinfo->textsize + 
-						    loadinfo->datasize + 
-						    loadinfo->segpad);
+                                                    loadinfo->textsize +
+                                                    loadinfo->datasize +
+                                                    loadinfo->segpad);
 #endif
       if (!loadinfo->textalloc)
         {
@@ -233,7 +238,9 @@ int modlib_load(FAR struct mod_loadinfo_s *loadinfo)
 
   if (loadinfo->datasize > 0)
     {
-      loadinfo->datastart = loadinfo->textalloc + loadinfo->textsize + loadinfo->segpad;
+      loadinfo->datastart = loadinfo->textalloc +
+                            loadinfo->textsize +
+                            loadinfo->segpad;
     }
 
   /* Load ELF section data into memory */
