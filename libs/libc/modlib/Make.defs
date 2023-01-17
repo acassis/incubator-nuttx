@@ -28,7 +28,9 @@ CSRCS += modlib_read.c modlib_registry.c modlib_sections.c
 CSRCS += modlib_symbols.c modlib_symtab.c modlib_uninit.c modlib_unload.c
 CSRCS += modlib_verify.c
 
-ASRCS += modlib_globals.S
+ifeq ($(CONFIG_ARCH_ARMV7M),y)
+ASRCS += modlib_armv7m_globals.S
+endif
 
 # Add the modlib directory to the build
 

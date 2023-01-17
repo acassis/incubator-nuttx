@@ -663,8 +663,8 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
                                 i * sizeof(Elf32_Rel));
               if (ret < 0)
                 {
-                  berr("ERROR: Section %d reloc %d:
-                        Failed to read relocation entry: %d\n",
+                  berr("ERROR: Section %d reloc %d:"
+                       "Failed to read relocation entry: %d\n",
                        relidx, i, ret);
                   break;
                 }
@@ -674,8 +674,8 @@ static int modlib_relocatedyn(FAR struct module_s *modp,
 
           if (rel->r_offset < 0)
             {
-              berr("ERROR: Section %d reloc %d:
-                    Relocation address out of range, offset %ld\n",
+              berr("ERROR: Section %d reloc %d:"
+                   "Relocation address out of range, offset %ld\n",
                    relidx, i, rel->r_offset);
               ret = -EINVAL;
               lib_free(sym);

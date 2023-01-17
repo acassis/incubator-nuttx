@@ -552,7 +552,7 @@ void *modlib_findglobal(FAR struct module_s *modp,
   FAR Elf32_Shdr *strTab = &loadinfo->shdr[shdr->sh_link];
   int ret;
   struct epTable_s key;
-  struct epTalbe_s *res;
+  struct epTable_s *res;
   extern struct epTable_s globalTable[];
   extern int nGlobals;
 
