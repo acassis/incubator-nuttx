@@ -86,5 +86,14 @@ int rp2040_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_LPWAN_SX127X
+  ret = rp2040_lpwaninitialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize wireless driver:"
+                      " %d\n", ret);
+    }
+#endif /* CONFIG_LPWAN_SX127X */
+
   return OK;
 }

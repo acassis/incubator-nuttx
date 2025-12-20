@@ -46,10 +46,19 @@
 #define MAX_IRQBUTTON     BUTTON_USER2
 #define NUM_IRQBUTTONS    (BUTTON_USER1 - BUTTON_USER2 + 1)
 
-int rp2040_bringup(void);
+/* LoRa SX1276 */
+
+#define GPIO_SX127X_DIO0   7
+#define GPIO_SX127X_RESET  6
+
+int rp2040_bringup(void); 
 
 #if defined(CONFIG_DEV_GPIO) && !defined(CONFIG_ARCH_BOARD_COMMON)
 int rp2040_dev_gpio_init(void);
+#endif
+
+#ifdef CONFIG_LPWAN_SX127X
+int rp2040_lpwaninitialize(void);
 #endif
 
 #endif /* __BOARDS_ARM_RP2040_RASPBERRYPI_PICO_SRC_RP2040_PICO_H */
