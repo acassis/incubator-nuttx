@@ -35,6 +35,13 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Heltec WiFi LoRa32 GPIOs *************************************************/
+
+/* SX1276 pins */
+
+#define GPIO_SX127X_RESET   14    /* RESET connected to IO14 */
+#define GPIO_SX127X_DIO0    26    /* DIO0 connected to IO26  */
+
 /* ESP32-DevKitC GPIOs ******************************************************/
 
 /* BOOT Button */
@@ -239,6 +246,25 @@ int board_ws2812_initialize(
  ****************************************************************************/
 #ifdef CONFIG_ESP32_OPENETH
 int esp_openeth_initialize(void);
+#endif
+
+/****************************************************************************
+ * Name: esp32_lpwaninitialize
+ *
+ * Description:
+ *   Initialize the SX127x driver
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   Zero (OK) is returned on success; A negated errno value is returned
+ *   to indicate the nature of any failure.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_LPWAN_SX127X
+int esp32_lpwaninitialize(void);
 #endif
 
 #endif /* __ASSEMBLY__ */
