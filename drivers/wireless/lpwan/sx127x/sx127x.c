@@ -79,16 +79,16 @@
 
 /* FSK default frequency deviation is 5kHz */
 
-#define SX127X_FDEV_DEFAULT           (5000)
+#define SX127X_FDEV_DEFAULT           (20000)
 
 /* FSK/OOK bitrate default */
 
-#define SX127X_FOM_BITRATE_DEFAULT    (4800)
+#define SX127X_FOM_BITRATE_DEFAULT    (38400)
 
 /* FSK/OOK bandwidth default */
 
-#define SX127X_FSKOOK_RXBW_DEFAULT    FSKOOK_BANDWIDTH_15P6KHZ
-#define SX127X_FSKOOK_AFCBW_DEFAULT   FSKOOK_BANDWIDTH_20P8KHZ
+#define SX127X_FSKOOK_RXBW_DEFAULT    FSKOOK_BANDWIDTH_250KHZ
+#define SX127X_FSKOOK_AFCBW_DEFAULT   FSKOOK_BANDWIDTH_250KHZ
 
 /* Default LORA bandwidth */
 
@@ -129,6 +129,9 @@
 /* Total size for local RX FIFO */
 
 #define SX127X_RXFIFO_TOTAL_SIZE      (SX127X_RXFIFO_ITEM_SIZE*CONFIG_LPWAN_SX127X_RXFIFO_LEN)
+
+#define RX_STALL_TIMEOUT_MS           10000 /* Timeout RX: 10s */
+#define RX_WATCHDOG_PERIOD_MS         1000  /* workqueue watchdog: 1s */
 
 /* Some assertions */
 
@@ -282,6 +285,8 @@ struct sx127x_dev_s
   uint16_t rx_fifo_len;           /* Number of bytes stored in fifo */
   uint16_t nxt_read;              /* Next read index */
   uint16_t nxt_write;             /* Next write index */
+  clock_t  last_rx_tick;          /* Ticks of the RX event to detect timeout */
+  struct work_s rx_watchdog;      /* Watchdog to detect timeout */
 
   /* Circular RX packet buffer */
 
@@ -1238,6 +1243,36 @@ errout:
 #endif
 }
 
+static void sx127x_rx_watchdog(FAR void *arg)
+{
+  FAR struct sx127x_dev_s *dev = arg;
+  clock_t now = clock_systime_ticks();
+
+  if (dev->opmode == SX127X_OPMODE_RX &&
+      now - dev->last_rx_tick > MSEC2TICK(RX_STALL_TIMEOUT_MS))
+    {
+      wlerr("RX stall detected, restarting RX\n");
+
+      /* Leave RX to clear AFC + bit sync */
+      sx127x_opmode_set(dev, SX127X_OPMODE_STANDBY);
+
+      /* datasheet-safe delay */
+      up_udelay(100);
+
+      /* Re-enter RX */
+      sx127x_opmode_set(dev, SX127X_OPMODE_RX);
+
+      /* Avoid using old RX success, otherwise it always will fail */
+
+      dev->last_rx_tick = now;
+    }
+
+  /* Reschedule watchdog */
+  work_queue(LPWORK, &dev->rx_watchdog,
+             sx127x_rx_watchdog, dev,
+             MSEC2TICK(RX_WATCHDOG_PERIOD_MS));
+}
+
 /****************************************************************************
  * Name: sx127x_lora_isr0_process
  *
@@ -1433,6 +1468,15 @@ static int sx127x_fskook_isr0_process(FAR struct sx127x_dev_s *dev)
               ret = sx127x_fskook_rxhandle(dev);
               if (ret > 0)
                 {
+                  /* Keep a track of last RX time to detect timeout */
+
+                  dev->last_rx_tick = clock_systime_ticks();
+
+		  /* Prepare the work queue to take care of TX timeout */
+                  work_queue(LPWORK, &dev->rx_watchdog,
+                             sx127x_rx_watchdog, dev,
+                             MSEC2TICK(RX_WATCHDOG_PERIOD_MS));
+
                   if (dev->pfd)
                     {
                       /* Data available for input */
@@ -1453,6 +1497,9 @@ static int sx127x_fskook_isr0_process(FAR struct sx127x_dev_s *dev)
             }
 
           /* TODO: restart RX if continuous mode */
+	  if ((irq1 & SX127X_FOM_IRQ1_TIMEOUT) != 0)
+            {
+            }
 
           break;
         }
