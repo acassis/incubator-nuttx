@@ -79,11 +79,11 @@
 
 /* FSK default frequency deviation is 5kHz */
 
-#define SX127X_FDEV_DEFAULT           (20000)
+#define SX127X_FDEV_DEFAULT           (75000)
 
 /* FSK/OOK bitrate default */
 
-#define SX127X_FOM_BITRATE_DEFAULT    (38400)
+#define SX127X_FOM_BITRATE_DEFAULT    (76800)
 
 /* FSK/OOK bandwidth default */
 
