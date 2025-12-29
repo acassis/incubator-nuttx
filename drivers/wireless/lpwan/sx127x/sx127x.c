@@ -876,6 +876,40 @@ static ssize_t sx127x_read(FAR struct file *filep, FAR char *buffer,
 #endif
 }
 
+static int sx127x_wait_tx_done(struct sx127x_dev_s *dev,
+                               int timeout_ms)
+{
+  struct timespec ts;
+  int ret;
+
+  /* Get current time (CLOCK_MONOTONIC is preferred in drivers) */
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  /* Add timeout */
+  ts.tv_sec  += timeout_ms / 1000;
+  ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+
+  if (ts.tv_nsec >= 1000000000)
+    {
+      ts.tv_sec++;
+      ts.tv_nsec -= 1000000000;
+    }
+
+  ret = nxsem_timedwait(&dev->tx_sem, &ts);
+  if (ret < 0)
+    {
+      if (errno == ETIMEDOUT)
+        {
+          /* TX IRQ lost → recover */
+          return -ETIMEDOUT;
+        }
+
+      return -errno;
+    }
+
+  return OK;
+}
+
 /****************************************************************************
  * Name: sx127x_write
  *
@@ -936,7 +970,21 @@ static ssize_t sx127x_write(FAR struct file *filep, FAR const char *buffer,
 
   /* Wait for TXDONE */
 
-  nxsem_wait(&dev->tx_sem);
+  //nxsem_wait(&dev->tx_sem);
+  ret = sx127x_wait_tx_done(dev, 200); /* 200 ms */
+  if (ret < 0)
+    {
+      wlerr("TX Timeout\n");
+      /* reset radio, clear IRQs, etc */
+      nxsem_post(&dev->tx_sem);
+
+      sx127x_opmode_set(dev, SX127X_OPMODE_STANDBY);
+
+      sx127x_writeregbyte(dev, SX127X_FOM_IRQ1, 0xff);
+      sx127x_writeregbyte(dev, SX127X_FOM_IRQ2, 0xff);
+
+      sx127x_opmode_set(dev, SX127X_OPMODE_TX);
+    }
 
 errout:
   /* Change mode to IDLE after transfer
