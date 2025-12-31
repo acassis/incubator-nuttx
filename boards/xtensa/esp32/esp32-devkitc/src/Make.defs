@@ -20,7 +20,7 @@
 #
 ############################################################################
 
-CSRCS = esp32_boot.c esp32_bringup.c
+CSRCS = esp32_boot.c esp32_bringup.c etc_romfs.c
 
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32_appinit.c
