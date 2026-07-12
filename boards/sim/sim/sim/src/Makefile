@@ -53,6 +53,9 @@ endif
 ifeq ($(CONFIG_ETC_ROMFS),y)
   RCSRCS = etc/init.d/rc.sysinit etc/init.d/rcS
   RCRAWS = etc/group
+ifneq ($(CONFIG_AUDIOUTILS_PICOTTS),)
+  RCRAWS += etc/en-US_ta.bin etc/en-US_lh0_sg.bin
+endif
 endif
 
 ifeq ($(CONFIG_ARCH_BUTTONS),y)
