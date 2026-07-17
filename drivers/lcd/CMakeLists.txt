@@ -149,8 +149,8 @@ if(CONFIG_LCD)
     list(APPEND SRCS st7796.c)
   endif()
 
-  if(CONFIG_LCD_GC9A01)
-    list(APPEND SRCS gc9a01.c)
+  if(CONFIG_LCD_GC9XXX)
+    list(APPEND SRCS gc9xxx.c)
   endif()
 
   if(CONFIG_LCD_JD9851)

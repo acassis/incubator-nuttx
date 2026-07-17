@@ -978,52 +978,66 @@ config LCD_ST7796_FB_SIZE
 
 endif # LCD_ST7796
 
-config LCD_GC9A01
-	bool "Galaxycore GC9A01 TFT Controller"
+config LCD_GC9XXX
+	bool "Galaxycore GC9XXX TFT Controller"
 	default n
 
-if LCD_GC9A01
-config LCD_GC9A01_XRES
-	int "GC9A01 X Resolution"
-	default 240
+if LCD_GC9XXX
+choice
+	prompt "Select the GC9XXX LCD Controller"
+	default LCD_GC9A01
+
+config LCD_GC9A01
+	bool "GC9A01 Controller"
+
+config LCD_GC9B71
+	bool "GC9B71 Controller"
+
+endchoice
+
+config LCD_GC9XXX_XRES
+	int "X Resolution"
+	default 240 if LCD_GC9A01
+	default 320 if LCD_GC9B71
 	---help---
 		Specifies the X resolution of the LCD.
 
-config LCD_GC9A01_YRES
-	int "GC9A01 Y Resolution"
-	default 240
+config LCD_GC9XXX_YRES
+	int "Y Resolution"
+	default 240 if LCD_GC9A01
+	default 320 if LCD_GC9B71
 	---help---
 		Specifies the Y resolution of the LCD.
 
-config LCD_GC9A01_XOFFSET
-	int "GC9A01 X Offset"
+config LCD_GC9XXX_XOFFSET
+	int "X Offset"
 	default 0
 	---help---
 		Specifies the X offset of the LCD.
 
-config LCD_GC9A01_YOFFSET
-	int "GC9A01 Y Offset"
+config LCD_GC9XXX_YOFFSET
+	int "Y Offset"
 	default 0
 	---help---
 		Specifies the Y offset of the LCD.
 
-config LCD_GC9A01_BGR
+config LCD_GC9XXX_BGR
 	bool "Swap R & B channel"
 	default n
 
-config LCD_GC9A01_BPP
+config LCD_GC9XXX_BPP
 	int "Bit Per Pixel (12 or 16)"
 	default 16
 
-config LCD_GC9A01_SPIMODE
+config LCD_GC9XXX_SPIMODE
 	int "SPI Mode"
 	default 0
 
-config LCD_GC9A01_FREQUENCY
+config LCD_GC9XXX_FREQUENCY
 	int "SPI Frequency"
 	default 1000000
 
-endif # LCD_GC9A01
+endif # LCD_GC9XXX
 
 config LCD_JD9851
 	bool "Fitipower JD9851 TFT Controller"
