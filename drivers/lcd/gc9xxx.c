@@ -141,6 +141,75 @@
  * Private Types
  ****************************************************************************/
 
+#ifdef CONFIG_LCD_GC9A01
+static const uint8_t g_gc9xxx_init[] =
+{
+  /* cmd , len,/[value(s)], time delay (ms) */
+
+  GC9XXX_SWRESET, 0, 120,
+  GC9XXX_ENIREG2, 0, 0,
+  0xeb, 1, 0x14, 0,
+  GC9XXX_ENIREG1, 0, 0,
+  GC9XXX_ENIREG2, 0, 0,
+  0xeb, 1, 0x14, 0,
+  0x84, 1, 0x40, 0,
+  0x85, 1, 0xff, 0,
+  0x86, 1, 0xff, 0,
+  0x87, 1, 0xff, 0,
+  0x88, 1, 0x0a, 0,
+  0x89, 1, 0x21, 0,
+  0x8a, 1, 0x00, 0,
+  0x8b, 1, 0x80, 0,
+  0x8c, 1, 0x01, 0,
+  0x8d, 1, 0x01, 0,
+  0x8e, 1, 0xff, 0,
+  0x8f, 1, 0xff, 0,
+  0xb6, 2, 0x00, 0x00, 0,
+  0x3a, 1, 0x55, 0,
+  0x90, 4, 0x08, 0x08, 0x08, 0x08, 0,
+  0xbd, 1, 0x06, 0,
+  0xbc, 1, 0x00, 0,
+  0xff, 3, 0x60, 0x01, 0x04, 0,
+  0xc3, 1, 0x13, 0,
+  0xc4, 1, 0x13, 0,
+  0xc9, 1, 0x22, 0,
+  0xbe, 1, 0x11, 0,
+  0xe1, 2, 0x10, 0x0e, 0,
+  0xdf, 3, 0x21, 0x0c, 0x02, 0,
+  0xf0, 6, 0x45, 0x09, 0x08, 0x08, 0x26, 0x2a, 0,
+  0xf1, 6, 0x43, 0x70, 0x72, 0x36, 0x37, 0x6f, 0,
+  0xf2, 6, 0x45, 0x09, 0x08, 0x08, 0x26, 0x2a, 0,
+  0xf3, 6, 0x43, 0x70, 0x72, 0x36, 0x37, 0x6f, 0,
+  0xed, 2, 0x1b, 0x0b, 0,
+  0xae, 1, 0x77, 0,
+  0xcd, 1, 0x63, 0,
+  0x70, 9, 0x07, 0x07, 0x04, 0x0e, 0x0f, 0x09,
+           0x07, 0x08, 0x03, 0,
+  0xe8, 1, 0x34, 0,
+  0x62, 12, 0x18, 0x0d, 0x71, 0xed, 0x70, 0x70,
+            0x18, 0x0f, 0x71, 0xef, 0x70, 0x70, 0,
+  0x63, 12, 0x18, 0x11, 0x71, 0xf1, 0x70, 0x70,
+            0x18, 0x13, 0x71, 0xf3, 0x70, 0x70, 0,
+  0x64, 7, 0x28, 0x29, 0xf1, 0x01, 0xf1, 0x00,
+           0x07, 0,
+  0x66, 10, 0x3c, 0x00, 0xcd, 0x67, 0x45, 0x45,
+            0x10, 0x00, 0x00, 0x00, 0,
+  0x67, 10, 0x00, 0x3c, 0x00, 0x00, 0x00, 0x01,
+            0x54, 0x10, 0x32, 0x98, 0,
+  0x74, 7, 0x10, 0x85, 0x80, 0x00, 0x00, 0x4e,
+           0x00, 0,
+  0x98, 2, 0x3e, 0x07, 0,
+  GC9XXX_TEON, 0, 120
+};
+#else
+#ifdef CONFIG_LCD_GC9B71
+static const uint8_t g_gc9xxx_init[] =
+{
+  /* cmd , len,/[value(s)], time delay (ms) */
+
+};
+#endif
+
 /* This structure describes the state of this driver */
 
 struct gc9xxx_dev_s
@@ -345,62 +414,36 @@ static void gc9xxx_cmddata(FAR struct gc9xxx_dev_s *dev, uint8_t cmd,
 
 static void gc9xxx_init(FAR struct gc9xxx_dev_s *dev)
 {
-  gc9xxx_sendcmd(dev, GC9XXX_SWRESET);
-  up_mdelay(120);
-  gc9xxx_sendcmd(dev, GC9XXX_ENIREG2);
-  gc9xxx_cmddata(dev, 0xeb, (const uint8_t *) "\x14", 1);
-  gc9xxx_sendcmd(dev, GC9XXX_ENIREG1);
-  gc9xxx_sendcmd(dev, GC9XXX_ENIREG2);
-  gc9xxx_cmddata(dev, 0xeb, (const uint8_t *) "\x14", 1);
-  gc9xxx_cmddata(dev, 0x84, (const uint8_t *) "\x40", 1);
-  gc9xxx_cmddata(dev, 0x85, (const uint8_t *) "\xFF", 1);
-  gc9xxx_cmddata(dev, 0x86, (const uint8_t *) "\xFF", 1);
-  gc9xxx_cmddata(dev, 0x87, (const uint8_t *) "\xFF", 1);
-  gc9xxx_cmddata(dev, 0x88, (const uint8_t *) "\x0A", 1);
-  gc9xxx_cmddata(dev, 0x89, (const uint8_t *) "\x21", 1);
-  gc9xxx_cmddata(dev, 0x8a, (const uint8_t *) "\x00", 1);
-  gc9xxx_cmddata(dev, 0x8b, (const uint8_t *) "\x80", 1);
-  gc9xxx_cmddata(dev, 0x8c, (const uint8_t *) "\x01", 1);
-  gc9xxx_cmddata(dev, 0x8d, (const uint8_t *) "\x01", 1);
-  gc9xxx_cmddata(dev, 0x8e, (const uint8_t *) "\xFF", 1);
-  gc9xxx_cmddata(dev, 0x8f, (const uint8_t *) "\xFF", 1);
-  gc9xxx_cmddata(dev, 0xb6, (const uint8_t *) "\x00\x00", 2);
-  gc9xxx_cmddata(dev, 0x3a, (const uint8_t *) "\x55", 1);
-  gc9xxx_cmddata(dev, 0x90, (const uint8_t *) "\x08\x08\x08\x08", 4);
-  gc9xxx_cmddata(dev, 0xbd, (const uint8_t *) "\x06", 1);
-  gc9xxx_cmddata(dev, 0xbc, (const uint8_t *) "\x00", 1);
-  gc9xxx_cmddata(dev, 0xff, (const uint8_t *) "\x60\x01\x04", 3);
-  gc9xxx_cmddata(dev, 0xc3, (const uint8_t *) "\x13", 1);
-  gc9xxx_cmddata(dev, 0xc4, (const uint8_t *) "\x13", 1);
-  gc9xxx_cmddata(dev, 0xc9, (const uint8_t *) "\x22", 1);
-  gc9xxx_cmddata(dev, 0xbe, (const uint8_t *) "\x11", 1);
-  gc9xxx_cmddata(dev, 0xe1, (const uint8_t *) "\x10\x0E", 2);
-  gc9xxx_cmddata(dev, 0xdf, (const uint8_t *) "\x21\x0c\x02", 3);
-  gc9xxx_cmddata(dev, 0xf0, (const uint8_t *) "\x45\x09\x08\x08\x26\x2A", 6);
-  gc9xxx_cmddata(dev, 0xf1, (const uint8_t *) "\x43\x70\x72\x36\x37\x6F", 6);
-  gc9xxx_cmddata(dev, 0xf2, (const uint8_t *) "\x45\x09\x08\x08\x26\x2A", 6);
-  gc9xxx_cmddata(dev, 0xf3, (const uint8_t *) "\x43\x70\x72\x36\x37\x6F", 6);
-  gc9xxx_cmddata(dev, 0xed, (const uint8_t *) "\x1B\x0B", 2);
-  gc9xxx_cmddata(dev, 0xae, (const uint8_t *) "\x77", 1);
-  gc9xxx_cmddata(dev, 0xcd, (const uint8_t *) "\x63", 1);
-  gc9xxx_cmddata(dev, 0x70, (const uint8_t *)
-                 "\x07\x07\x04\x0E\x0F\x09\x07\x08\x03", 9);
-  gc9xxx_cmddata(dev, 0xe8, (const uint8_t *) "\x34", 1);
-  gc9xxx_cmddata(dev, 0x62, (const uint8_t *)
-                 "\x18\x0D\x71\xED\x70\x70\x18\x0F\x71\xEF\x70\x70", 12);
-  gc9xxx_cmddata(dev, 0x63, (const uint8_t *)
-                 "\x18\x11\x71\xF1\x70\x70\x18\x13\x71\xF3\x70\x70", 12);
-  gc9xxx_cmddata(dev, 0x64, (const uint8_t *)
-                 "\x28\x29\xF1\x01\xF1\x00\x07", 7);
-  gc9xxx_cmddata(dev, 0x66, (const uint8_t *)
-                 "\x3C\x00\xCD\x67\x45\x45\x10\x00\x00\x00", 10);
-  gc9xxx_cmddata(dev, 0x67, (const uint8_t *)
-                 "\x00\x3C\x00\x00\x00\x01\x54\x10\x32\x98", 10);
-  gc9xxx_cmddata(dev, 0x74, (const uint8_t *)
-                 "\x10\x85\x80\x00\x00\x4E\x00", 7);
-  gc9xxx_cmddata(dev, 0x98, (const uint8_t *) "\x3e\x07", 2);
-  gc9xxx_sendcmd(dev, GC9XXX_TEON);
-  up_mdelay(120);
+  const uint8_t *p = g_gc9xxx_init;
+  const uint8_t *end = p + sizeof(g_gc9xxx_init);
+
+  while (p < end)
+  {
+    uint8_t cmd   = *p++;
+    uint8_t len   = *p++;
+    uint8_t delay = 0;
+
+    /* If the command doesn't have paramenters */
+
+    if (len == 0)
+      {
+        gc9xxx_sendcmd(dev, cmd);
+      }
+    else
+      {
+        gc9xxx_cmddata(dev, cmd, p, len);
+        p += len;
+      }
+
+    delay = *p++;
+
+    /* If the command require some delay before continuing */
+
+    if (delay != 0)
+      {
+        up_mdelay(delay);
+      }
+  }
 }
 
 /****************************************************************************
