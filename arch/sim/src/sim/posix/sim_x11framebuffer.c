@@ -96,6 +96,44 @@ static unsigned int g_offset;
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: sim_x11ioerrorhandler
+ *
+ * Description:
+ *   Installed as the process-wide Xlib IOError handler (XSetIOErrorHandler,
+ *   below): called if the X connection itself is lost -- as opposed to an
+ *   ordinary protocol error (sim_x11errorhandler), which the X server can
+ *   report while the connection stays up. Xlib's own default handler
+ *   prints a message and calls exit(), which is fine on its own, but the
+ *   atexit(sim_x11uninit) cleanup that then runs (registered in
+ *   sim_x11uninitialize(), below) still tries to use the now-dead g_display
+ *   (XShmDetach()/XCloseDisplay()) and crashes a second time doing so, on
+ *   top of whatever broke the connection in the first place. Nulling
+ *   g_display here first means sim_x11uninit()'s existing `if (g_display
+ *   == NULL) return;` guard makes that cleanup a no-op instead.
+ *
+ *   This does not, and cannot, prevent the connection loss itself: it can
+ *   originate entirely server-side (a flaky X backend, e.g. a buggy
+ *   xorgxrdp session -- the specific case this was found and verified
+ *   against; see the NuttX documentation this is referenced from). This
+ *   handler only keeps that from also taking the whole process down with
+ *   a second, unrelated-looking crash on the way out.
+ *
+ * Returned Value:
+ *   Never returns -- calls exit(), same as Xlib's own default handler
+ *   would (an XIOErrorHandler is not allowed to return per the Xlib
+ *   contract; the int return type is only for signature compatibility).
+ *
+ ****************************************************************************/
+
+static int sim_x11ioerrorhandler(Display *display)
+{
+  syslog(LOG_ERR, "X11 connection lost -- disabling X11 framebuffer "
+                   "output.\n");
+  g_display = NULL;
+  exit(1);
+}
+
+/****************************************************************************
  * Name: sim_x11createframe
  ****************************************************************************/
 
@@ -114,12 +152,23 @@ static inline Display *sim_x11createframe(void)
   XTextProperty iconprop;
   XSizeHints hints;
 
+  /* Must be the first Xlib call the process makes. Harmless here even
+   * though this bug turned out not to be a thread-safety issue in the
+   * end (see docs); still correct practice for a Display this codebase
+   * already touches from more than one NuttX task (sim_x11events() vs.
+   * sim_x11update() -- see arch/sim/src/sim/posix/sim_x11eventloop.c).
+   */
+
+  XInitThreads();
+
   display = XOpenDisplay(NULL);
   if (display == NULL)
     {
       syslog(LOG_ERR, "Unable to open display.\n");
       return NULL;
     }
+
+  XSetIOErrorHandler(sim_x11ioerrorhandler);
 
   g_screen = DefaultScreen(display);
   g_window = XCreateSimpleWindow(display, DefaultRootWindow(display),
