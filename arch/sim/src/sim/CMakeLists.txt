@@ -225,6 +225,8 @@ if(CONFIG_SIM_X11FB)
     list(APPEND HOSTSRCS sim_x11eventloop.c)
   elseif(CONFIG_SIM_BUTTONS)
     list(APPEND HOSTSRCS sim_x11eventloop.c)
+  elseif(CONFIG_SIM_KEYBOARD)
+    list(APPEND HOSTSRCS sim_x11eventloop.c)
   endif()
 
   if(CONFIG_SIM_KEYBOARD)

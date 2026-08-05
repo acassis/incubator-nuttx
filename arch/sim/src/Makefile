@@ -213,6 +213,8 @@ else ifeq ($(CONFIG_SIM_AJOYSTICK),y)
   HOSTSRCS += sim_x11eventloop.c
 else ifeq ($(CONFIG_SIM_BUTTONS),y)
   HOSTSRCS += sim_x11eventloop.c
+else ifeq ($(CONFIG_SIM_KEYBOARD),y)
+  HOSTSRCS += sim_x11eventloop.c
 endif
 
 ifeq ($(CONFIG_SIM_KEYBOARD),y)

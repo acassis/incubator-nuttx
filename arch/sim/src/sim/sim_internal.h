@@ -339,7 +339,7 @@ void sim_kbdevent(uint32_t key, bool is_press);
 /* sim_eventloop.c **********************************************************/
 
 #if defined(CONFIG_SIM_TOUCHSCREEN) || defined(CONFIG_SIM_AJOYSTICK) || \
-    defined(CONFIG_ARCH_BUTTONS) || defined(CONFING_SIM_KEYBOARD)
+    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD)
 void sim_x11events(void);
 void sim_buttonevent(int x, int y, int buttons);
 #endif
