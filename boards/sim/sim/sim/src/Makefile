@@ -22,6 +22,16 @@
 
 include $(TOPDIR)/Make.defs
 
+# sim_bringup.c calls netinit_bringup() (see CONFIG_NETUTILS_NETINIT)
+# directly, for boards whose CONFIG_INIT_ENTRYPOINT isn't nsh_main --
+# NSH normally brings the network up itself, but nothing else does.
+# apps/include isn't part of this (kernel-side) Makefile's include
+# path by default, unlike apps/ packages' own Make.defs, so it needs
+# adding explicitly for that one header.
+ifeq ($(CONFIG_NETUTILS_NETINIT),y)
+CFLAGS += ${INCDIR_PREFIX}"$(TOPDIR)$(DELIM)$(CONFIG_APPS_DIR)$(DELIM)include"
+endif
+
 # Add dummy.c to ensure that we have at least one object.
 # On some platforms like macOS, we can't create an empty archive.
 CSRCS = dummy.c

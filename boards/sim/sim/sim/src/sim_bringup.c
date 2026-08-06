@@ -62,6 +62,10 @@
 #include <nuttx/lcd/lcd_dev.h>
 #endif
 
+#ifdef CONFIG_NETUTILS_NETINIT
+#include <netutils/netinit.h>
+#endif
+
 #ifdef CONFIG_VNCSERVER
 #  include <nuttx/video/vnc.h>
 #endif
@@ -622,6 +626,19 @@ int sim_bringup(void)
     {
       syslog(LOG_ERR, "ERROR: timer_wdog_initialize failed: %d\n", ret);
     }
+#endif
+
+#ifdef CONFIG_NETUTILS_NETINIT
+  /* ClauCoDillo real networking: bring up the (TAP-backed) network
+   * device with its static IP/gateway/DNS config. Normally this
+   * happens implicitly inside NSH's own startup, but this board's
+   * CONFIG_INIT_ENTRYPOINT is dillo_main directly, not nsh_main, so
+   * nothing else would ever call it -- same pattern as
+   * apps/system/nxinit's own direct netinit_bringup() call for a
+   * non-NSH entrypoint.
+   */
+
+  netinit_bringup();
 #endif
 
   return ret;
