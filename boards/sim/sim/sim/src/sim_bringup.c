@@ -155,26 +155,23 @@ int sim_bringup(void)
 #endif
 
 #ifdef CONFIG_FS_HOSTFS
-  /* ClauCoDillo file://-loading test: mount a small test-page
-   * directory at /host so dillo_main() can be pointed at a real local
-   * HTML file (e.g. by temporarily setting CONFIG_INIT_ARGS to
-   * "\"file:///host/test.html\"" in claucodillo_build's defconfig)
-   * without needing a compiled-in romfs image. Path is relative to
-   * the nuttx/ build directory, which every documented build/run
-   * workflow in this port already treats as the working directory
-   * (`cd nuttx && make && ./nuttx`), so this works the same for
-   * anyone reproducing the test, not just on this machine.
+  /* ClauCoDillo file:// loading: mount a small test-page directory at
+   * /host so dillo_main() can be pointed at a real local HTML file
+   * (see CONFIG_INIT_ARGS in claucodillo_build's defconfig, currently
+   * "file:///host/test.html") without needing a compiled-in romfs
+   * image. Path is relative to the nuttx/ build directory, which
+   * every documented build/run workflow in this port already treats
+   * as the working directory (`cd nuttx && make && ./nuttx`), so this
+   * works the same for anyone reproducing the test, not just on this
+   * machine.
    *
-   * Not wired up as the default boot URL: loading file:// (like
-   * http://) goes through ClauCoDillo's dpi-plugin architecture in
-   * this fork (the "file" dpi), which this port doesn't implement yet
-   * -- see docs/analysis.md's Linux-assumption audit. Confirmed via
-   * this exact test: navigating to file:///host/test.html hits the
-   * same "can't start dpi daemon" retry loop as any other scheme and
-   * never renders. CONFIG_INIT_ENTRYPOINT stays on dillo_main's
-   * default about:splash boot (which does NOT need dpi and renders
-   * correctly) so a stock build demonstrates a real, working page
-   * render out of the box.
+   * file:// loading no longer needs the dpi daemon this port doesn't
+   * implement: ClauCoDillo's src/localfile.c (a new file, not part of
+   * upstream) loads file:// URLs in-process instead of via the "file"
+   * dpi plugin -- see that file's own comment, and
+   * docs/analysis.md's Linux-assumption audit, for the full story.
+   * This mount is what makes file:///host/... resolve to something
+   * real for that in-process loader to read.
    */
 
   ret = nx_mount(NULL, "/host", "hostfs", 0,
