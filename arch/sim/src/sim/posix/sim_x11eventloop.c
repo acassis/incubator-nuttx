@@ -123,10 +123,29 @@ void sim_x11events(void)
         {
           #ifdef CONFIG_SIM_KEYBOARD
           case KeyPress:
-            sim_kbdevent(XLookupKeysym(&event.xkey, 0), true);
-            break;
           case KeyRelease:
-            sim_kbdevent(XLookupKeysym(&event.xkey, 0), false);
+            {
+              /* XLookupKeysym(event, 0) always returns the *unshifted*
+               * symbol for the key's primary keycode, ignoring
+               * event.xkey.state entirely -- Shift+; still reports ';'
+               * (never ':'), and Shift+<letter> still reports the
+               * lowercase letter. XLookupString() is the correct,
+               * standard X11 call for this: it applies the *actual*
+               * current modifier state (Shift/CapsLock/etc, via the
+               * keyboard mapping) to resolve the right keysym, the same
+               * way any normal X11 application derives typed
+               * characters. The string-buffer/compose-status
+               * parameters aren't needed here -- only the resolved
+               * keysym is -- so both are effectively unused (an empty
+               * buffer, NULL compose state).
+               */
+
+              char buf[8];
+              KeySym keysym = NoSymbol;
+
+              XLookupString(&event.xkey, buf, sizeof(buf), &keysym, NULL);
+              sim_kbdevent((uint32_t)keysym, event.type == KeyPress);
+            }
             break;
           #endif
 
