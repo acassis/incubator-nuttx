@@ -154,6 +154,38 @@ int sim_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_FS_HOSTFS
+  /* ClauCoDillo file://-loading test: mount a small test-page
+   * directory at /host so dillo_main() can be pointed at a real local
+   * HTML file (e.g. by temporarily setting CONFIG_INIT_ARGS to
+   * "\"file:///host/test.html\"" in claucodillo_build's defconfig)
+   * without needing a compiled-in romfs image. Path is relative to
+   * the nuttx/ build directory, which every documented build/run
+   * workflow in this port already treats as the working directory
+   * (`cd nuttx && make && ./nuttx`), so this works the same for
+   * anyone reproducing the test, not just on this machine.
+   *
+   * Not wired up as the default boot URL: loading file:// (like
+   * http://) goes through ClauCoDillo's dpi-plugin architecture in
+   * this fork (the "file" dpi), which this port doesn't implement yet
+   * -- see docs/analysis.md's Linux-assumption audit. Confirmed via
+   * this exact test: navigating to file:///host/test.html hits the
+   * same "can't start dpi daemon" retry loop as any other scheme and
+   * never renders. CONFIG_INIT_ENTRYPOINT stays on dillo_main's
+   * default about:splash boot (which does NOT need dpi and renders
+   * correctly) so a stock build demonstrates a real, working page
+   * render out of the box.
+   */
+
+  ret = nx_mount(NULL, "/host", "hostfs", 0,
+                  "fs=boards/sim/sim/sim/configs/claucodillo_build/htdocs");
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to mount hostfs at /host: %d\n",
+             ret);
+    }
+#endif
+
 #ifdef CONFIG_LIBC_ZONEINFO_ROMFS
   /* Mount the TZ database */
 
