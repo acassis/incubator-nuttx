@@ -51,7 +51,8 @@
  ****************************************************************************/
 
 #if defined(CONFIG_SIM_TOUCHSCREEN) || defined(CONFIG_SIM_AJOYSTICK) || \
-    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD)
+    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD) || \
+    defined(CONFIG_SIM_MOUSE)
 static struct work_s g_x11event_work;   /* Watchdog for event loop */
 #endif
 
@@ -94,7 +95,8 @@ static void sim_init_cmdline(void)
  ****************************************************************************/
 
 #if defined(CONFIG_SIM_TOUCHSCREEN) || defined(CONFIG_SIM_AJOYSTICK) || \
-    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD)
+    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD) || \
+    defined(CONFIG_SIM_MOUSE)
 static void sim_x11event_work(void *arg)
 {
   sim_x11events();
@@ -331,7 +333,8 @@ void up_initialize(void)
 #endif
 
 #if defined(CONFIG_SIM_TOUCHSCREEN) || defined(CONFIG_SIM_AJOYSTICK) || \
-    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD)
+    defined(CONFIG_SIM_BUTTONS) || defined(CONFIG_SIM_KEYBOARD) || \
+    defined(CONFIG_SIM_MOUSE)
   work_queue_wq(g_work_queue, &g_x11event_work, sim_x11event_work,
                 NULL, SIM_X11EVENT_PERIOD);
 #endif
