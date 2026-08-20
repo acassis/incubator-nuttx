@@ -301,7 +301,8 @@ static int usbhost_uvc_data_stop(FAR struct imgdata_s *data);
 
 static int usbhost_uvc_buildenum(FAR struct uvc_state_s *priv);
 static int usbhost_uvc_register(FAR struct uvc_state_s *priv);
-static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv);
+static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv,
+                                   int first);
 static void usbhost_uvc_devno_free(FAR struct uvc_state_s *priv);
 static int usbhost_uvc_parse(FAR struct uvc_state_s *priv,
                              FAR const uint8_t *configdesc, int desclen);
@@ -2253,12 +2254,15 @@ static int usbhost_uvc_data_stop(FAR struct imgdata_s *data)
  * Name: usbhost_uvc_devno_alloc
  *
  * Description:
- *   Take the lowest free /dev/videoN minor number, so that several cameras
- *   can be attached at once.
+ *   Reserve the lowest free /dev/videoN number at or above 'first', so that
+ *   several cameras can be attached at once.
+ *
+ * Returned Value:
+ *   The reserved number, or -EMFILE if none is left.
  *
  ****************************************************************************/
 
-static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv)
+static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv, int first)
 {
   int devno;
   int ret;
@@ -2269,7 +2273,7 @@ static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv)
       return ret;
     }
 
-  for (devno = 0; devno < UVC_MAX_DEVICES; devno++)
+  for (devno = first; devno < UVC_MAX_DEVICES; devno++)
     {
       uint8_t bit = 1 << devno;
 
@@ -2278,7 +2282,7 @@ static int usbhost_uvc_devno_alloc(FAR struct uvc_state_s *priv)
           g_uvc_devinuse |= bit;
           priv->devno = devno;
           nxmutex_unlock(&g_uvc_devlock);
-          return OK;
+          return devno;
         }
     }
 
@@ -2447,17 +2451,8 @@ static int usbhost_uvc_buildenum(FAR struct uvc_state_s *priv)
 static int usbhost_uvc_register(FAR struct uvc_state_s *priv)
 {
   FAR struct imgsensor_s *sensor = &priv->sensor;
+  int next = 0;
   int ret;
-
-  ret = usbhost_uvc_devno_alloc(priv);
-  if (ret < 0)
-    {
-      uerr("ERROR: No free video device number: %d\n", ret);
-      return ret;
-    }
-
-  snprintf(priv->devpath, sizeof(priv->devpath), UVC_DEVNAME_FMT,
-           priv->devno);
 
   priv->sensor.ops          = &g_uvc_sensor_ops;
   priv->sensor.fmtdescs     = priv->fmtdescs;
@@ -2468,12 +2463,42 @@ static int usbhost_uvc_register(FAR struct uvc_state_s *priv)
   priv->sensor.frmintervals_num = priv->frmintervals_num;
   priv->data.ops            = &g_uvc_data_ops;
 
-  ret = capture_register(priv->devpath, &priv->data, &sensor, 1);
-  if (ret < 0)
+  /* Take the lowest device number that is free.  Our own bookkeeping only
+   * knows about cameras this driver registered; another driver may already
+   * hold the name, an on-board sensor for instance, and that shows up as
+   * -EEXIST.  Move on to the next number rather than giving up, so that a
+   * USB camera still appears alongside whatever else the board has.
+   */
+
+  for (; ; )
     {
-      uerr("ERROR: capture_register(%s) failed: %d\n", priv->devpath, ret);
+      ret = usbhost_uvc_devno_alloc(priv, next);
+      if (ret < 0)
+        {
+          uerr("ERROR: No free video device number: %d\n", ret);
+          return ret;
+        }
+
+      next = ret + 1;
+      snprintf(priv->devpath, sizeof(priv->devpath), UVC_DEVNAME_FMT,
+               priv->devno);
+
+      ret = capture_register(priv->devpath, &priv->data, &sensor, 1);
+      if (ret >= 0)
+        {
+          break;
+        }
+
       usbhost_uvc_devno_free(priv);
-      return ret;
+
+      if (ret != -EEXIST)
+        {
+          uerr("ERROR: capture_register(%s) failed: %d\n", priv->devpath,
+               ret);
+          return ret;
+        }
+
+      uinfo("%s is taken, trying the next one\n", priv->devpath);
     }
 
   uinfo("Registered %s\n", priv->devpath);
