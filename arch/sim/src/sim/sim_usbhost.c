@@ -514,7 +514,7 @@ static void sim_usbhost_transfer_cb(void *arg, ssize_t result)
 
   if (result < 0)
     {
-      uerr("transfer result: %d\n", result);
+      uerr("transfer result: %zd\n", result);
     }
 
   epinfo->xfrd = result;
