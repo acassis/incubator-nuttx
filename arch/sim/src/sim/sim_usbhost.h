@@ -93,6 +93,7 @@ struct host_usb_datareq_s
 
 /* Host USB host Interface */
 
+void host_usbhost_setdevice(const char *selector);
 int host_usbhost_init(void);
 bool host_usbhost_getconnstate(void);
 int host_usbhost_open(void);

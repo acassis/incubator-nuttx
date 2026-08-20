@@ -41,6 +41,9 @@
 #include <nuttx/syslog/syslog_rpmsg.h>
 
 #include "sim_internal.h"
+#ifdef CONFIG_SIM_USB_HOST
+#  include "sim_usbhost.h"
+#endif
 
 /****************************************************************************
  * Public Data
@@ -173,6 +176,9 @@ int main(int argc, char **argv, char **envp)
   /* Parse simulator-specific options before handing control to NuttX.
    * --sim-rt-ratio=<percent>  Set simulated-to-real time ratio in percent
    *   (default 100).  Values > 100 speed up simulated time; < 100 slow down.
+   * --sim-usb-device=<selector>  Select the physical USB device that the
+   *   simulated USB host controller attaches to.  See
+   *   host_usbhost_setdevice() for the selector syntax.
    */
 
   for (i = 1; i < argc; i++)
@@ -181,6 +187,12 @@ int main(int argc, char **argv, char **envp)
         {
           host_set_timeratio(atoi(argv[i] + 15));
         }
+#ifdef CONFIG_SIM_USB_HOST
+      else if (strncmp(argv[i], "--sim-usb-device=", 17) == 0)
+        {
+          host_usbhost_setdevice(argv[i] + 17);
+        }
+#endif
     }
 
 #ifdef CONFIG_ALLSYMS

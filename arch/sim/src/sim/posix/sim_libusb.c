@@ -69,6 +69,12 @@
 #  define USB_PID               0x4e11
 #endif
 
+#ifdef CONFIG_SIM_USB_DEVICE
+#  define USB_DEVICE            CONFIG_SIM_USB_DEVICE
+#else
+#  define USB_DEVICE            ""
+#endif
+
 #define HOST_LIBUSB_FIFO_NUM    8
 
 #define HOST_LIBUSB_FIFO_USED(fifo) \
@@ -108,6 +114,13 @@ struct host_libusb_hostdev_s
 static libusb_context *g_libusb_context;
 static struct host_libusb_hostdev_s g_libusb_dev;
 static libusb_device **g_libusb_dev_list;
+
+/* The device selector.  See host_usbhost_setdevice() for the syntax.  It
+ * defaults to the build-time CONFIG_SIM_USB_DEVICE and may be overridden
+ * from the simulator command line before host_usbhost_init() runs.
+ */
+
+static char g_libusb_selector[64] = USB_DEVICE;
 
 /****************************************************************************
  * Private Functions
@@ -535,6 +548,111 @@ static void *host_libusb_event_handle(void *arg)
   return NULL;
 }
 
+/****************************************************************************
+ * Name: host_libusb_hasifclass
+ *
+ * Description:
+ *   Return true if any interface of any configuration of 'dev' declares the
+ *   given interface class.  This is what allows a device to be selected by
+ *   what it *is* (a webcam, a printer, ...) instead of by a hard-coded
+ *   vendor and product ID.
+ *
+ ****************************************************************************/
+
+static bool host_libusb_hasifclass(libusb_device *dev,
+                                   const struct libusb_device_descriptor *dd,
+                                   uint8_t ifclass)
+{
+  uint8_t cfg;
+
+  if (dd->bDeviceClass == ifclass)
+    {
+      return true;
+    }
+
+  for (cfg = 0; cfg < dd->bNumConfigurations; cfg++)
+    {
+      struct libusb_config_descriptor *config;
+      bool found = false;
+      int i;
+
+      if (host_uninterruptible(libusb_get_config_descriptor, dev, cfg,
+                               &config) != LIBUSB_SUCCESS)
+        {
+          continue;
+        }
+
+      for (i = 0; i < config->bNumInterfaces && !found; i++)
+        {
+          int alt;
+
+          for (alt = 0; alt < config->interface[i].num_altsetting; alt++)
+            {
+              if (config->interface[i].altsetting[alt].bInterfaceClass ==
+                  ifclass)
+                {
+                  found = true;
+                  break;
+                }
+            }
+        }
+
+      host_uninterruptible_no_return(libusb_free_config_descriptor, config);
+
+      if (found)
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
+/****************************************************************************
+ * Name: host_libusb_matchdev
+ *
+ * Description:
+ *   Test one device against the active selector.  An empty selector falls
+ *   back to the build-time CONFIG_SIM_USB_VID/CONFIG_SIM_USB_PID pair.
+ *
+ ****************************************************************************/
+
+static bool host_libusb_matchdev(libusb_device *dev,
+                                 const struct libusb_device_descriptor *dd)
+{
+  unsigned int a;
+  unsigned int b;
+
+  if (dd->bDeviceClass == LIBUSB_CLASS_HUB)
+    {
+      return false;
+    }
+
+  if (g_libusb_selector[0] == '\0')
+    {
+      return dd->idVendor == USB_VID && dd->idProduct == USB_PID;
+    }
+
+  if (sscanf(g_libusb_selector, "class=%x", &a) == 1)
+    {
+      return host_libusb_hasifclass(dev, dd, (uint8_t)a);
+    }
+
+  if (sscanf(g_libusb_selector, "%x:%x", &a, &b) == 2)
+    {
+      return dd->idVendor == a && dd->idProduct == b;
+    }
+
+  if (sscanf(g_libusb_selector, "%u.%u", &a, &b) == 2)
+    {
+      return host_uninterruptible(libusb_get_bus_number, dev) == a &&
+             host_uninterruptible(libusb_get_device_address, dev) == b;
+    }
+
+  ERROR("Malformed USB device selector \"%s\"", g_libusb_selector);
+  return false;
+}
+
 static bool host_libusb_connectdevice(void)
 {
   int dev_cnt;
@@ -547,6 +665,7 @@ static bool host_libusb_connectdevice(void)
     {
       ERROR("libusb_get_device_list() failed: %s\n",
             host_uninterruptible(libusb_strerror, dev_cnt));
+      g_libusb_dev_list = NULL;
       return false;
     }
 
@@ -563,14 +682,13 @@ static bool host_libusb_connectdevice(void)
           continue;
         }
 
-      if (dev_desc.bDeviceClass == LIBUSB_CLASS_HUB)
+      if (host_libusb_matchdev(dev, &dev_desc))
         {
-          continue;
-        }
+          INFO("Selected USB device %04x:%04x on bus %d address %d",
+               dev_desc.idVendor, dev_desc.idProduct,
+               host_uninterruptible(libusb_get_bus_number, dev),
+               host_uninterruptible(libusb_get_device_address, dev));
 
-      if (dev_desc.idVendor == USB_VID ||
-          dev_desc.idProduct == USB_PID)
-        {
           g_libusb_dev.priv = dev;
           memcpy(&g_libusb_dev.dev_desc, &dev_desc,
                  sizeof(struct libusb_device_descriptor));
@@ -590,15 +708,36 @@ static int host_libusb_hotplug_callback(libusb_context *ctx,
                                         void *user_data)
 {
   struct host_libusb_hostdev_s *dev = &g_libusb_dev;
-
-  INFO("Hotplug event: %d\n", event);
+  struct libusb_device_descriptor dev_desc;
 
   if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
     {
+      /* Ignore devices that the selector does not name.  The hotplug filter
+       * itself matches everything because the selector may be a class or a
+       * bus/address, neither of which libusb can filter on.
+       */
+
+      if (dev->connected ||
+          host_uninterruptible(libusb_get_device_descriptor, device,
+                               &dev_desc) != LIBUSB_SUCCESS ||
+          !host_libusb_matchdev(device, &dev_desc))
+        {
+          return LIBUSB_SUCCESS;
+        }
+
+      INFO("Device arrived");
       dev->connected = true;
     }
   else
     {
+      /* Only our own device leaving is a disconnect */
+
+      if (dev->priv != NULL && device != dev->priv)
+        {
+          return LIBUSB_SUCCESS;
+        }
+
+      INFO("Device left");
       dev->connected = false;
     }
 
@@ -608,6 +747,37 @@ static int host_libusb_hotplug_callback(libusb_context *ctx,
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: host_usbhost_setdevice
+ *
+ * Description:
+ *   Select which physical USB device the simulated host controller attaches
+ *   to.  Must be called before host_usbhost_init().  The selector is one of:
+ *
+ *     "class=XX"   The first device exposing an interface of USB class XX,
+ *                  given in hexadecimal.  "class=0e" is any USB Video Class
+ *                  webcam, whatever its vendor.
+ *     "VID:PID"    Vendor and product ID, both in hexadecimal.
+ *     "bus.addr"   Bus number and device address in decimal, as printed by
+ *                  lsusb.  Use this to pick one of several identical
+ *                  devices.
+ *
+ *   An empty or NULL selector falls back to CONFIG_SIM_USB_VID and
+ *   CONFIG_SIM_USB_PID.
+ *
+ ****************************************************************************/
+
+void host_usbhost_setdevice(const char *selector)
+{
+  if (selector == NULL)
+    {
+      g_libusb_selector[0] = '\0';
+      return;
+    }
+
+  snprintf(g_libusb_selector, sizeof(g_libusb_selector), "%s", selector);
+}
 
 int host_usbhost_ep0trans(struct host_usb_ctrlreq_s *ctrlreq,
                           struct host_usb_datareq_s *datareq)
@@ -789,9 +959,10 @@ int host_usbhost_init(void)
           g_libusb_context,
           (libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT |
           LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED),
-          (libusb_hotplug_flag) 0, USB_VID, USB_PID,
+          (libusb_hotplug_flag) 0, LIBUSB_HOTPLUG_MATCH_ANY,
+          LIBUSB_HOTPLUG_MATCH_ANY,
           LIBUSB_HOTPLUG_MATCH_ANY, host_libusb_hotplug_callback,
-          NULL, NULL);
+          NULL, &g_libusb_dev.callback_handle);
   if (ret != LIBUSB_SUCCESS)
     {
       ERROR("libusb_hotplug_register_callback() failed: %s\n",

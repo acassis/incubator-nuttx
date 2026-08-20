@@ -1,0 +1,33 @@
+# udev rules granting userspace (libusb) access to USB Video Class devices
+# for the NuttX simulator's USB host emulation (CONFIG_SIM_LIBUSB).
+#
+# The NuttX SIM UVC host driver talks to a physical webcam directly from
+# userspace, so the process running ./nuttx needs read/write access to the
+# device's usbfs node.  These rules grant that access to members of the
+# "plugdev" group for USB Video Class devices only.  No vendor or product ID
+# is matched, so any UVC webcam is covered.
+#
+# They do NOT detach the kernel uvcvideo driver.  Detaching happens per
+# interface, at run time, only while NuttX SIM has the camera open, and the
+# kernel driver is re-attached when NuttX SIM exits.  The webcam therefore
+# remains a normal Linux camera whenever NuttX SIM is not running.
+#
+# Install:
+#   sudo install -m 0644 tools/sim/99-nuttx-uvc.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger --attr-match=subsystem=usb
+# (or simply replug the webcam)
+#
+# Uninstall:
+#   sudo rm /etc/udev/rules.d/99-nuttx-uvc.rules
+#   sudo udevadm control --reload-rules
+#
+# Match the USB device node (not the interface nodes) of any device that
+# exposes at least one USB Video Class interface.  udev's usb_id builtin
+# publishes the interface class/subclass/protocol triples of every interface
+# of the device in ID_USB_INTERFACES, formatted as ":ccsspp:ccsspp:".  Video
+# class is 0x0e, so ":0e" identifies a webcam regardless of vendor, product,
+# or where in the descriptor hierarchy the class is declared.
+
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
+  ENV{ID_USB_INTERFACES}=="*:0e*", MODE="0660", GROUP="plugdev"

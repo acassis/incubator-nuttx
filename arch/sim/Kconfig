@@ -977,13 +977,41 @@ config SIM_LIBUSB
 	---help---
 		Use libusb to set up virtual USB Host controller.
 
+config SIM_USB_DEVICE
+	string "Physical USB device selector"
+	default ""
+	depends on SIM_LIBUSB
+	---help---
+		Selects which physical USB device on the Linux host the simulated USB
+		host controller attaches to.  One of:
+
+		  class=XX   The first device exposing an interface of USB class XX,
+		             in hexadecimal.  "class=0e" is any USB Video Class
+		             webcam, regardless of vendor.
+		  VID:PID    Vendor and product ID, both in hexadecimal.
+		  bus.addr   Bus number and device address in decimal, as printed by
+		             lsusb.  Use this to pick one of several identical
+		             devices.
+
+		Leave empty to fall back to SIM_USB_VID and SIM_USB_PID.
+
+		The simulator command line option --sim-usb-device=<selector>
+		overrides this setting, so a build does not have to be tied to one
+		device.
+
 config SIM_USB_VID
 	hex "Simulated USB Dev VID"
 	default 0x18d1
+	---help---
+		Vendor ID of the physical USB device to attach to, used only when
+		SIM_USB_DEVICE is empty and no --sim-usb-device option is given.
 
 config SIM_USB_PID
 	hex "Simulated USB Dev PID"
 	default 0x4e11
+	---help---
+		Product ID of the physical USB device to attach to, used only when
+		SIM_USB_DEVICE is empty and no --sim-usb-device option is given.
 
 config SIM_USB_STACKSIZE
 	int "Simulated USB waiter stack size"
