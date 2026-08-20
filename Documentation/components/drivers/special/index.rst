@@ -47,6 +47,7 @@ following section.
   usbdev.rst
   uvc.rst
   usbhost.rst
+  usbhost_uvc.rst
   usbmisc.rst
   usbmonitor.rst
   usrsock.rst
