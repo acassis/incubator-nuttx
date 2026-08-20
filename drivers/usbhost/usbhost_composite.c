@@ -483,6 +483,7 @@ int usbhost_composite(FAR struct usbhost_hubport_s *hport,
   FAR uint8_t *cfgbuffer;
   uint32_t mergeset;
   uint16_t nintfs;
+  bool bound = false;
   uint16_t nmerged;
   uint16_t nclasses;
   int cfgsize;
@@ -789,14 +790,44 @@ int usbhost_composite(FAR struct usbhost_hubport_s *hport,
       ret = CLASS_CONNECT(member->usbclass, cfgbuffer, cfgsize);
       if (ret < 0)
         {
-          /* On failure, call the class disconnect method of each contained
-           * class which should then free the allocated usbclass instance.
+          uerr("ERROR: CLASS_CONNECT failed: %d\n", ret);
+
+          /* Release this member.  Its connect() method is required to leave
+           * the instance valid on failure and to leave freeing it to us.
            */
 
-          uerr("ERROR: CLASS_CONNECT failed: %d\n", ret);
+          CLASS_DISCONNECTED(member->usbclass);
+          member->usbclass = NULL;
+
+#ifdef CONFIG_USBHOST_COMPOSITE_STRICT
           goto errout_with_cfgbuffer;
+#else
+          /* One function refusing the device does not make the others
+           * unusable.  A multifunction device commonly carries a function
+           * its driver cannot handle beside functions it can: a webcam that
+           * pairs a colour camera with an infrared one, for example, where
+           * the second offers only a vendor pixel format.  Keep going, in
+           * the same spirit as a member for which no class driver could be
+           * found at all.
+           */
+
+          continue;
+#endif
         }
+
+      bound = true;
     }
+
+#ifndef CONFIG_USBHOST_COMPOSITE_STRICT
+  if (!bound)
+    {
+      /* Not one member could be bound, so nothing would drive this device */
+
+      uerr("ERROR: No member of the composite device could be bound\n");
+      ret = -ENODEV;
+      goto errout_with_cfgbuffer;
+    }
+#endif
 
   /* Free the temporary buffer */
 
