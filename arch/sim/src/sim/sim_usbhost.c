@@ -52,7 +52,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define SIM_USBHOST_BUFSIZE     256
+#define SIM_USBHOST_BUFSIZE     CONFIG_SIM_USB_BUFSIZE
 #define SIM_USBHOST_PERIOD      MSEC2TICK(CONFIG_SIM_LOOP_INTERVAL)
 
 #define RHPNDX(rh)              ((rh)->hport.hport.port)

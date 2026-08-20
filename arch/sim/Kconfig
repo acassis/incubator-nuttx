@@ -1013,6 +1013,20 @@ config SIM_USB_PID
 		Product ID of the physical USB device to attach to, used only when
 		SIM_USB_DEVICE is empty and no --sim-usb-device option is given.
 
+config SIM_USB_BUFSIZE
+	int "Simulated USB host descriptor buffer size"
+	default 2048
+	---help---
+		Size of the buffers returned by the host controller driver's alloc()
+		method.  Enumeration reads the whole configuration descriptor into one
+		of these, so this must be at least as large as the largest
+		configuration descriptor of any device the simulator attaches to, or
+		enumeration fails with -E2BIG.
+
+		Simple devices need only a couple of hundred bytes, but a device with
+		many class-specific descriptors needs far more: a USB Video Class
+		webcam typically reports around one kilobyte.
+
 config SIM_USB_STACKSIZE
 	int "Simulated USB waiter stack size"
 	default 1024
