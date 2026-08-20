@@ -1571,10 +1571,31 @@ static void usbhost_uvc_complete(FAR void *arg, ssize_t result)
    * free.
    */
 
-  if (--priv->inflight == 0)
+  if (--priv->inflight > 0)
     {
-      nxsem_post(&priv->donesem);
+      return;
     }
+
+  if (priv->streaming)
+    {
+      /* Nobody asked us to stop, yet not one transfer could be queued
+       * again.  The camera has stopped answering: a reset, a fault, or an
+       * unplug the host controller has not reported yet.  Give up rather
+       * than sit idle, and tell whoever is capturing, so that a blocked
+       * reader is released instead of waiting for a frame that will never
+       * arrive.
+       */
+
+      uerr("ERROR: The stream stopped answering; abandoning it\n");
+      priv->streaming = false;
+
+      if (priv->capture_cb != NULL)
+        {
+          priv->capture_cb(1, 0, NULL, priv->capture_arg);
+        }
+    }
+
+  nxsem_post(&priv->donesem);
 }
 
 /****************************************************************************
