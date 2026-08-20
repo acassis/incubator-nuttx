@@ -75,7 +75,7 @@
 #  define USB_DEVICE            ""
 #endif
 
-#define HOST_LIBUSB_FIFO_NUM    8
+#define HOST_LIBUSB_FIFO_NUM    16
 #define HOST_LIBUSB_MAX_IFACES  32
 
 #define HOST_LIBUSB_FIFO_USED(fifo) \
@@ -309,10 +309,9 @@ static void host_libusb_inttransfer_cb(struct libusb_transfer *transfer)
 #ifndef CONFIG_USBHOST_ISOC_DISABLE
 static void host_libusb_isotransfer_cb(struct libusb_transfer *transfer)
 {
+  struct host_libusb_hostdev_s *dev = &g_libusb_dev;
   struct libusb_iso_packet_descriptor *packet;
   struct host_usb_datareq_s *datareq;
-  usbhost_asynch_t callback;
-  size_t length;
   int i;
 
   if (transfer == NULL)
@@ -324,24 +323,46 @@ static void host_libusb_isotransfer_cb(struct libusb_transfer *transfer)
     }
 
   datareq = (struct host_usb_datareq_s *)transfer->user_data;
-  callback = datareq->callback;
 
-  for (i = 0; i < transfer->num_iso_packets; i++)
+  if (transfer->status != LIBUSB_TRANSFER_COMPLETED)
     {
-      packet = &transfer->iso_packet_desc[i];
-      length = packet->status == LIBUSB_TRANSFER_COMPLETED ?
-                                      packet->actual_length : 0;
-
-      /* If there are multiple isoc packages, only the actual length
-       * of the data in each package is returned here. Because each
-       * package has the same size, the number of packages returned
-       * needs to be recorded in class driver.
+      DEBUG("isochronous transfer failed: %d", transfer->status);
+      datareq->success = false;
+    }
+  else
+    {
+      /* Report the length of each packet separately.  A class driver cannot
+       * recover packet boundaries from the total, and for the protocols that
+       * run over isochronous endpoints the boundaries carry meaning: an
+       * empty packet is normal, a short packet is normal, and each packet
+       * begins with its own header.
        */
 
-      callback(datareq->priv, length);
+      datareq->success = true;
+
+      for (i = 0; i < transfer->num_iso_packets; i++)
+        {
+          uint16_t length;
+
+          packet = &transfer->iso_packet_desc[i];
+          length = packet->status == LIBUSB_TRANSFER_COMPLETED ?
+                   packet->actual_length : 0;
+
+          if (datareq->pktlen != NULL)
+            {
+              datareq->pktlen[i] = length;
+            }
+
+          datareq->xfer += length;
+        }
     }
 
-  free(datareq);
+  /* Completion is reported through the same queue as every other transfer
+   * type, so that the class driver's callback runs on a NuttX thread rather
+   * than on the libusb event thread.
+   */
+
+  host_libusb_fifopush(&dev->completed, datareq);
   host_uninterruptible_no_return(libusb_free_transfer, transfer);
 }
 #endif
@@ -675,7 +696,8 @@ host_libusb_isotransfer(struct host_libusb_hostdev_s *dev, uint8_t addr,
   int ret;
 
   max_packet_size = datareq->maxpacketsize;
-  num_iso_pack = (datareq->len + max_packet_size - 1) / max_packet_size;
+  num_iso_pack = datareq->npackets > 0 ? datareq->npackets :
+                 (datareq->len + max_packet_size - 1) / max_packet_size;
   transfer = host_uninterruptible(libusb_alloc_transfer, num_iso_pack);
   if (transfer == NULL)
     {

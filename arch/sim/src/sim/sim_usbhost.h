@@ -80,11 +80,19 @@ struct host_usb_datareq_s
   uint8_t                     xfrtype;
   uint16_t                    maxpacketsize;
   uint8_t                    *data;
-  uint16_t                    len;
-  uint16_t                    xfer;
+  uint32_t                    len;
+  uint32_t                    xfer;
   bool                        success;
   void                       *priv;
   usbhost_asynch_t            callback;
+
+  /* Isochronous transfers only.  The transfer covers 'npackets' packets of
+   * 'maxpacketsize' bytes each, and the length actually received in each of
+   * them is reported in 'pktlen'.  See DRVR_ISOCASYNCH().
+   */
+
+  uint16_t                    npackets;
+  uint16_t                   *pktlen;
 };
 
 /****************************************************************************
