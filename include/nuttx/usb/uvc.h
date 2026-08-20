@@ -139,6 +139,33 @@
   { 'Y', 'U', 'Y', '2', 0x00, 0x00, 0x10, 0x00, \
     0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 }
 
+/* Further format GUIDs a host may find in an uncompressed format
+ * descriptor.  They share the Microsoft media subtype suffix; only the first
+ * four bytes, the FourCC, differ.
+ */
+
+#define UVC_GUID_FORMAT_NV12 \
+  { 'N', 'V', '1', '2', 0x00, 0x00, 0x10, 0x00, \
+    0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 }
+
+#define UVC_GUID_FORMAT_UYVY \
+  { 'U', 'Y', 'V', 'Y', 0x00, 0x00, 0x10, 0x00, \
+    0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 }
+
+#define UVC_GUID_LEN                      16
+
+/* Interface descriptor layout, used when parsing rather than emitting
+ * descriptors.  Only the fields up to and including the class-specific
+ * length are fixed; the descriptors below carry trailing variable-length
+ * arrays that must be read out by offset.
+ */
+
+#define UVC_VS_INPUT_HEADER_MINLEN        13
+#define UVC_VC_HEADER_MINLEN              12
+#define UVC_FORMAT_UNCOMPRESSED_LEN       27
+#define UVC_FORMAT_MJPEG_LEN              11
+#define UVC_FRAME_MINLEN                  26
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -166,6 +193,116 @@ begin_packed_struct struct uvc_streaming_control_s
 } end_packed_struct;
 
 #define UVC_PROBE_COMMIT_SIZE  sizeof(struct uvc_streaming_control_s)
+
+/* The probe and commit payload grew with the specification, and a device
+ * answers with, and expects, the length that matches the bcdUVC it reports
+ * in its VideoControl header descriptor.  Sending the wrong length is a
+ * common reason for a camera to stall the request.
+ *
+ *   UVC 1.0   26 bytes, ending at dwMaxPayloadTransferSize
+ *   UVC 1.1   34 bytes, adding the clock frequency and version fields
+ *   UVC 1.5   48 bytes
+ */
+
+#define UVC_PROBE_COMMIT_SIZE_10          26
+#define UVC_PROBE_COMMIT_SIZE_11          34
+#define UVC_PROBE_COMMIT_SIZE_15          48
+
+/* Class-specific VideoControl interface header descriptor (Table 3-3).
+ * Followed by bInCollection interface numbers.
+ */
+
+begin_packed_struct struct uvc_vc_header_desc_s
+{
+  uint8_t  blength;
+  uint8_t  bdescriptortype;             /* UVC_CS_INTERFACE */
+  uint8_t  bdescriptorsubtype;          /* UVC_VC_HEADER */
+  uint16_t bcduvc;
+  uint16_t wtotallength;
+  uint32_t dwclockfrequency;
+  uint8_t  bincollection;
+  uint8_t  bainterfacenr[1];            /* Actually bincollection entries */
+} end_packed_struct;
+
+/* Class-specific VideoStreaming interface input header descriptor
+ * (Table 3-14).  Followed by bNumFormats control bitmaps of bControlSize
+ * bytes each.
+ */
+
+begin_packed_struct struct uvc_vs_input_header_desc_s
+{
+  uint8_t  blength;
+  uint8_t  bdescriptortype;             /* UVC_CS_INTERFACE */
+  uint8_t  bdescriptorsubtype;          /* UVC_VS_INPUT_HEADER */
+  uint8_t  bnumformats;
+  uint16_t wtotallength;
+  uint8_t  bendpointaddress;
+  uint8_t  bminfo;
+  uint8_t  bterminallink;
+  uint8_t  bstillcapturemethod;
+  uint8_t  btriggersupport;
+  uint8_t  btriggerusage;
+  uint8_t  bcontrolsize;
+  uint8_t  bmacontrols[1];              /* Actually bnumformats entries */
+} end_packed_struct;
+
+/* Uncompressed video format descriptor (Table 3-1 of the payload spec) */
+
+begin_packed_struct struct uvc_format_uncompressed_desc_s
+{
+  uint8_t  blength;
+  uint8_t  bdescriptortype;             /* UVC_CS_INTERFACE */
+  uint8_t  bdescriptorsubtype;          /* UVC_VS_FORMAT_UNCOMPRESSED */
+  uint8_t  bformatindex;
+  uint8_t  bnumframedescriptors;
+  uint8_t  guidformat[UVC_GUID_LEN];
+  uint8_t  bbitsperpixel;
+  uint8_t  bdefaultframeindex;
+  uint8_t  baspectratiox;
+  uint8_t  baspectratioy;
+  uint8_t  bminterlaceflags;
+  uint8_t  bcopyprotect;
+} end_packed_struct;
+
+/* MJPEG video format descriptor (Table 3-1 of the payload spec) */
+
+begin_packed_struct struct uvc_format_mjpeg_desc_s
+{
+  uint8_t  blength;
+  uint8_t  bdescriptortype;             /* UVC_CS_INTERFACE */
+  uint8_t  bdescriptorsubtype;          /* UVC_VS_FORMAT_MJPEG */
+  uint8_t  bformatindex;
+  uint8_t  bnumframedescriptors;
+  uint8_t  bmflags;
+  uint8_t  bdefaultframeindex;
+  uint8_t  baspectratiox;
+  uint8_t  baspectratioy;
+  uint8_t  bminterlaceflags;
+  uint8_t  bcopyprotect;
+} end_packed_struct;
+
+/* Frame descriptor.  The uncompressed and MJPEG frame descriptors have the
+ * same layout, differing only in bDescriptorSubtype.  When
+ * bFrameIntervalType is zero the descriptor continues with a continuous
+ * min/max/step triple, otherwise with bFrameIntervalType discrete intervals.
+ */
+
+begin_packed_struct struct uvc_frame_desc_s
+{
+  uint8_t  blength;
+  uint8_t  bdescriptortype;             /* UVC_CS_INTERFACE */
+  uint8_t  bdescriptorsubtype;          /* UVC_VS_FRAME_UNCOMPRESSED/MJPEG */
+  uint8_t  bframeindex;
+  uint8_t  bmcapabilities;
+  uint16_t wwidth;
+  uint16_t wheight;
+  uint32_t dwminbitrate;
+  uint32_t dwmaxbitrate;
+  uint32_t dwmaxvideoframebuffersize;
+  uint32_t dwdefaultframeinterval;
+  uint8_t  bframeintervaltype;
+  uint32_t dwframeinterval[1];          /* Discrete, or min/max/step */
+} end_packed_struct;
 
 /* UVC gadget initialization parameters.
  * The application queries the video device at runtime and passes
