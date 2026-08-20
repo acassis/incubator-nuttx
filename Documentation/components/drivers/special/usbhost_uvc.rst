@@ -291,17 +291,26 @@ justification, in keeping with the minimum-change principle.
     boundaries.  Additive and guarded by ``CONFIG_USBHOST_ISOC_DISABLE``.
 
 ``drivers/usbhost/usbhost_composite.c``
-    Fixed the per-function configuration descriptor that is handed to a
-    composite member's ``connect()``.  It previously skipped interfaces whose
-    alternate setting 0 declares zero endpoints and stopped after the first
-    alternate setting's endpoints, which silently dropped both the UVC
-    VideoStreaming class-specific descriptors (they hang off alternate setting
-    0, which has no endpoint) and every isochronous alternate setting.  The
-    fix copies all descriptors belonging to the interface.  The fixed-size 99
-    byte scratch buffer was replaced by one sized from the configuration
-    descriptor itself, which is by construction an upper bound.  This is a bug
-    fix for composite devices with alternate settings in general, not a UVC
-    special case.
+    Two fixes, both for composite devices in general rather than for UVC in
+    particular.
+
+    The per-function configuration descriptor handed to a member's
+    ``connect()`` previously skipped interfaces whose alternate setting 0
+    declares zero endpoints, and stopped after the first alternate setting's
+    endpoints, which silently dropped both the UVC VideoStreaming
+    class-specific descriptors (they hang off alternate setting 0, which has
+    no endpoint) and every isochronous alternate setting.  All descriptors
+    belonging to the interface are now copied, and the fixed-size 99 byte
+    scratch buffer was replaced by one sized from the configuration
+    descriptor itself, which is by construction an upper bound.
+
+    A member returning an error from ``connect()`` used to fail the whole
+    device, which then re-enumerated and failed again indefinitely.  A webcam
+    that pairs a colour camera with an infrared one presents two video
+    functions where the infrared one offers only a vendor pixel format, and
+    refusing it should not cost the user the colour camera.  The failed
+    member is now released and the rest kept, as already happens for a member
+    with no registered driver at all.
 
 ``arch/sim/src/sim/sim_usbhost.c``, ``arch/sim/src/sim/sim_usbhost.h``
     Enlarged the descriptor buffer returned by ``DRVR_ALLOC`` (a UVC
@@ -311,17 +320,51 @@ justification, in keeping with the minimum-change principle.
     instead of calling back from the libusb event thread.
 
 ``arch/sim/src/sim/posix/sim_libusb.c``
-    Device selection by command line rather than by compiled-in VID/PID,
-    ``SET_INTERFACE`` support (mandatory for isochronous alternate settings),
-    claim/release of every interface of the selected configuration rather than
-    interface 0 only, and orderly release on shutdown.
+    Device selection by command line rather than by compiled-in VID/PID;
+    ``SET_INTERFACE`` support, mandatory for isochronous alternate settings;
+    control transfers with a host-to-device data stage, which the UVC probe
+    and commit requests are and which were previously dropped; claim and
+    release of every interface of the selected configuration rather than
+    interface 0 only; release of the device on every interceptable exit path,
+    so the host camera comes back; and a fix for a request being both queued
+    as a completion and freed when libusb refused it.
 
 ``arch/sim/Kconfig``, ``drivers/usbhost/Kconfig``, ``boards/sim/...``
     Configuration for the above.
 
 ``apps``
-    None.  ``nxcamera`` is used unmodified.
+    None.  ``nxcamera`` is used unmodified, and no application-side change
+    turned out to be necessary.
 
-Build instructions, host permission requirements, webcam selection and
-troubleshooting are documented in ``usbhost_uvc_usage.rst``, added together
-with the configuration options.
+Build instructions, host permission requirements, webcam selection,
+configuration options and troubleshooting are in
+:doc:`usbhost_uvc_usage`.
+
+Verified behaviour
+==================
+
+Measured on two cameras, a Logitech C920 (046d:082d) and the Microdia
+0c45:672e built into a laptop, both reporting UVC 1.00:
+
+* Both enumerate, and their descriptors are parsed into the formats and frame
+  sizes they advertise: 19 uncompressed and 17 MJPEG frame sizes for the
+  C920, 7 and 5 for the Microdia.  Formats neither camera describes in terms
+  this driver knows are skipped without affecting the rest.
+* The Microdia's second, infrared video function offers only an unsupported
+  format.  It is refused and the colour camera still works.
+* Uncompressed 640x480 at 30fps negotiates a 614400 byte frame on both.  The
+  C920 asks 2688 bytes per microframe and the driver selects alternate
+  setting 10; as MJPEG the same picture needs 640 bytes and it selects
+  alternate setting 4, reserving a quarter of the bus bandwidth.
+* nxcamera streams from ``/dev/video0`` and a live picture appears in the X11
+  window, with no dropped or spoiled frames logged over 25 seconds.
+* Stopping and restarting at another resolution renegotiates and moves to a
+  different alternate setting.
+* With no camera attached, or with a selector matching nothing, the simulator
+  runs normally and no video device appears.
+* An unsupported frame size or pixel format is refused with ``-EINVAL``.
+* Killing the simulator mid-stream with SIGTERM or SIGINT returns the camera
+  to Linux; with SIGKILL it does not, and the documented recovery is to run
+  the simulator once more and exit it normally.
+* A forced USB port reset under a running stream is detected: the driver
+  abandons the stream and releases the application rather than retrying.
