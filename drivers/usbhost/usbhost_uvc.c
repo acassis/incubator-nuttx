@@ -127,6 +127,21 @@ struct uvc_state_s
 
   uint8_t  nformats;
   FAR struct uvc_formatinfo_s *formats;
+
+  /* Driver-allocated buffers for endpoint 0 traffic */
+
+  FAR uint8_t *ctrlreq;            /* struct usb_ctrlreq_s */
+  FAR uint8_t *ctrlbuf;            /* Probe/commit payload */
+
+  /* What the last successful negotiation settled on */
+
+  FAR struct uvc_formatinfo_s *curfmt;
+  FAR struct uvc_frameinfo_s  *curframe;
+  uint32_t curinterval;            /* Frame interval, 100ns units */
+  uint32_t maxframesize;           /* dwMaxVideoFrameSize */
+  uint32_t maxpayload;             /* dwMaxPayloadTransferSize */
+  uint8_t  curalt;                 /* Alternate setting that carries it */
+  uint16_t curpktsize;             /* Its endpoint's bytes per microframe */
 };
 
 /****************************************************************************
@@ -150,6 +165,19 @@ static int usbhost_uvc_disconnected(FAR struct usbhost_class_s *usbclass);
 /* Descriptor parsing */
 
 static uint32_t usbhost_uvc_pixfmt(FAR const uint8_t *guid);
+static int usbhost_uvc_allocbuffers(FAR struct uvc_state_s *priv);
+static void usbhost_uvc_freebuffers(FAR struct uvc_state_s *priv);
+static int usbhost_uvc_vsrequest(FAR struct uvc_state_s *priv, uint8_t req,
+                                 uint8_t cs, FAR uint8_t *data,
+                                 uint16_t len);
+static int usbhost_uvc_negotiate(FAR struct uvc_state_s *priv,
+                                 FAR struct uvc_formatinfo_s *fmt,
+                                 FAR struct uvc_frameinfo_s *frame,
+                                 uint32_t interval, bool commit);
+static void usbhost_uvc_selectalt(FAR struct uvc_state_s *priv);
+static void usbhost_uvc_defaults(FAR struct uvc_state_s *priv,
+                                 FAR struct uvc_formatinfo_s **fmt,
+                                 FAR struct uvc_frameinfo_s **frame);
 static int usbhost_uvc_parse(FAR struct uvc_state_s *priv,
                              FAR const uint8_t *configdesc, int desclen);
 
@@ -208,6 +236,21 @@ static struct usbhost_registry_s g_uvc =
 static uint16_t usbhost_uvc_getle16(FAR const uint8_t *val)
 {
   return (uint16_t)val[1] << 8 | (uint16_t)val[0];
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_putle16
+ *
+ * Description:
+ *   Store a little endian 16-bit value into a descriptor or request field
+ *   that is declared as a byte array.
+ *
+ ****************************************************************************/
+
+static void usbhost_uvc_putle16(FAR uint8_t *dest, uint16_t val)
+{
+  dest[0] = (uint8_t)(val & 0xff);
+  dest[1] = (uint8_t)(val >> 8);
 }
 
 /****************************************************************************
@@ -730,6 +773,397 @@ static int usbhost_uvc_parse(FAR struct uvc_state_s *priv,
 }
 
 /****************************************************************************
+ * Name: usbhost_uvc_allocbuffers
+ *
+ * Description:
+ *   Allocate the endpoint 0 buffers through the host controller driver, so
+ *   that they satisfy whatever alignment or memory region the controller
+ *   needs for control traffic.
+ *
+ ****************************************************************************/
+
+static int usbhost_uvc_allocbuffers(FAR struct uvc_state_s *priv)
+{
+  FAR struct usbhost_hubport_s *hport = priv->usbclass.hport;
+  size_t maxlen;
+  int ret;
+
+  ret = DRVR_ALLOC(hport->drvr, &priv->ctrlreq, &maxlen);
+  if (ret < 0)
+    {
+      uerr("ERROR: DRVR_ALLOC of the control request failed: %d\n", ret);
+      return ret;
+    }
+
+  if (maxlen < sizeof(struct usb_ctrlreq_s))
+    {
+      uerr("ERROR: Control buffer too small: %zu\n", maxlen);
+      return -ENOMEM;
+    }
+
+  ret = DRVR_ALLOC(hport->drvr, &priv->ctrlbuf, &maxlen);
+  if (ret < 0)
+    {
+      uerr("ERROR: DRVR_ALLOC of the control buffer failed: %d\n", ret);
+      return ret;
+    }
+
+  if (maxlen < UVC_PROBE_COMMIT_SIZE_15)
+    {
+      uerr("ERROR: Control buffer too small for a probe payload: %zu\n",
+           maxlen);
+      return -ENOMEM;
+    }
+
+  return OK;
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_freebuffers
+ ****************************************************************************/
+
+static void usbhost_uvc_freebuffers(FAR struct uvc_state_s *priv)
+{
+  FAR struct usbhost_hubport_s *hport = priv->usbclass.hport;
+
+  if (priv->ctrlreq != NULL)
+    {
+      DRVR_FREE(hport->drvr, priv->ctrlreq);
+      priv->ctrlreq = NULL;
+    }
+
+  if (priv->ctrlbuf != NULL)
+    {
+      DRVR_FREE(hport->drvr, priv->ctrlbuf);
+      priv->ctrlbuf = NULL;
+    }
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_vsrequest
+ *
+ * Description:
+ *   Issue one class-specific request to the VideoStreaming interface.  The
+ *   direction is taken from the request code, as the UVC specification
+ *   encodes it there: the GET_* codes have bit 7 set, SET_CUR does not.
+ *
+ * Input Parameters:
+ *   priv - The driver state
+ *   req  - UVC_SET_CUR, UVC_GET_CUR, UVC_GET_MIN, UVC_GET_MAX, UVC_GET_RES,
+ *          UVC_GET_DEF or UVC_GET_LEN
+ *   cs   - The control selector, UVC_VS_PROBE_CONTROL or
+ *          UVC_VS_COMMIT_CONTROL
+ *   data - The payload, sent or received
+ *   len  - Its length
+ *
+ * Returned Value:
+ *   Zero on success, or a negated errno value.  A camera that does not
+ *   implement an optional request stalls it, which arrives here as an
+ *   error and is a normal answer rather than a failure.
+ *
+ ****************************************************************************/
+
+static int usbhost_uvc_vsrequest(FAR struct uvc_state_s *priv, uint8_t req,
+                                 uint8_t cs, FAR uint8_t *data,
+                                 uint16_t len)
+{
+  FAR struct usbhost_hubport_s *hport = priv->usbclass.hport;
+  FAR struct usb_ctrlreq_s *ctrlreq;
+  bool in = (req & USB_REQ_DIR_IN) != 0;
+
+  if (priv->disconnected)
+    {
+      return -ENODEV;
+    }
+
+  ctrlreq       = (FAR struct usb_ctrlreq_s *)priv->ctrlreq;
+  ctrlreq->type = (in ? USB_REQ_DIR_IN : USB_REQ_DIR_OUT) |
+                  USB_REQ_TYPE_CLASS | USB_REQ_RECIPIENT_INTERFACE;
+  ctrlreq->req  = req;
+
+  /* The control selector goes in the high byte of wValue, the low byte is
+   * zero.  wIndex names the interface the control lives on.
+   */
+
+  usbhost_uvc_putle16(ctrlreq->value, (uint16_t)cs << 8);
+  usbhost_uvc_putle16(ctrlreq->index, priv->streamif);
+  usbhost_uvc_putle16(ctrlreq->len, len);
+
+  if (in)
+    {
+      return DRVR_CTRLIN(hport->drvr, hport->ep0, ctrlreq, data);
+    }
+
+  return DRVR_CTRLOUT(hport->drvr, hport->ep0, ctrlreq, data);
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_negotiate
+ *
+ * Description:
+ *   Run the UVC streaming negotiation for one format, frame size and frame
+ *   interval.
+ *
+ *   Negotiation is a conversation, not a command.  The host proposes a
+ *   configuration with SET_CUR on the probe control, and the camera answers
+ *   GET_CUR with the configuration it will actually deliver, which is not
+ *   necessarily the one proposed: it fills in the payload and frame sizes,
+ *   and it may move the frame interval, or even the format and frame index,
+ *   to something it can sustain.  Whatever comes back is what gets
+ *   committed, so this function reports the camera's answer rather than the
+ *   proposal.
+ *
+ *   The proposal starts from the camera's own defaults, read with GET_DEF,
+ *   so that the fields this driver has no opinion about, key frame rate and
+ *   compression quality among them, carry values the camera likes.  A
+ *   camera that does not implement GET_DEF stalls it, which is not fatal.
+ *
+ * Input Parameters:
+ *   priv     - The driver state
+ *   fmt      - The format to ask for
+ *   frame    - The frame size to ask for
+ *   interval - The frame interval to ask for, in 100ns units
+ *   commit   - Commit the result, which makes it take effect as soon as the
+ *              streaming interface is switched to an alternate setting with
+ *              bandwidth.  When false the camera is only asked what it
+ *              would do, which is how the driver validates a format without
+ *              disturbing the current one.
+ *
+ * Returned Value:
+ *   Zero on success, or a negated errno value.
+ *
+ ****************************************************************************/
+
+static int usbhost_uvc_negotiate(FAR struct uvc_state_s *priv,
+                                 FAR struct uvc_formatinfo_s *fmt,
+                                 FAR struct uvc_frameinfo_s *frame,
+                                 uint32_t interval, bool commit)
+{
+  FAR struct uvc_streaming_control_s *ctrl =
+    (FAR struct uvc_streaming_control_s *)priv->ctrlbuf;
+  uint8_t len = priv->probelen;
+  uint32_t maxpayload;
+  uint32_t maxframe;
+  int ret;
+
+  /* Start from the camera's defaults where it offers them */
+
+  memset(ctrl, 0, UVC_PROBE_COMMIT_SIZE_15);
+
+  ret = usbhost_uvc_vsrequest(priv, UVC_GET_DEF, UVC_VS_PROBE_CONTROL,
+                              priv->ctrlbuf, len);
+  if (ret < 0)
+    {
+      uinfo("GET_DEF is not supported (%d), proposing from zero\n", ret);
+      memset(ctrl, 0, UVC_PROBE_COMMIT_SIZE_15);
+    }
+
+  /* Ask for this format, frame size and frame interval.  bmHint bit 0 tells
+   * the camera to keep the frame interval fixed and vary everything else.
+   */
+
+  ctrl->bmhint          = htole16(1);
+  ctrl->bformatindex    = fmt->index;
+  ctrl->bframeindex     = frame->index;
+  ctrl->dwframeinterval = htole32(interval);
+
+  ret = usbhost_uvc_vsrequest(priv, UVC_SET_CUR, UVC_VS_PROBE_CONTROL,
+                              priv->ctrlbuf, len);
+  if (ret < 0)
+    {
+      uerr("ERROR: Probe SET_CUR rejected: %d\n", ret);
+      return ret;
+    }
+
+  /* Read back what the camera will really do */
+
+  ret = usbhost_uvc_vsrequest(priv, UVC_GET_CUR, UVC_VS_PROBE_CONTROL,
+                              priv->ctrlbuf, len);
+  if (ret < 0)
+    {
+      uerr("ERROR: Probe GET_CUR failed: %d\n", ret);
+      return ret;
+    }
+
+  maxframe   = le32toh(ctrl->dwmaxvideoframesize);
+  maxpayload = le32toh(ctrl->dwmaxpayloadtransfersize);
+
+  if (ctrl->bformatindex != fmt->index ||
+      ctrl->bframeindex != frame->index)
+    {
+      /* The camera substituted something else.  That is its right, and the
+       * substitution is what will be delivered, so take it.
+       */
+
+      uwarn("WARNING: Camera answered with format %d frame %d, "
+            "not the requested format %d frame %d\n",
+            ctrl->bformatindex, ctrl->bframeindex, fmt->index,
+            frame->index);
+    }
+
+  /* A camera is allowed to report no payload size, and a few report
+   * nonsense.  Fall back to the frame size, which always bounds a payload.
+   */
+
+  if (maxpayload == 0 || maxpayload > maxframe + UVC_PAYLOAD_HEADER_LEN)
+    {
+      maxpayload = maxframe != 0 ? maxframe : frame->maxbuffersize;
+    }
+
+  if (maxframe == 0)
+    {
+      maxframe = frame->maxbuffersize;
+    }
+
+  if (maxframe == 0)
+    {
+      uerr("ERROR: Camera reports no frame size\n");
+      return -EIO;
+    }
+
+  if (commit)
+    {
+      ret = usbhost_uvc_vsrequest(priv, UVC_SET_CUR, UVC_VS_COMMIT_CONTROL,
+                                  priv->ctrlbuf, len);
+      if (ret < 0)
+        {
+          uerr("ERROR: Commit rejected: %d\n", ret);
+          return ret;
+        }
+    }
+
+  priv->curfmt      = fmt;
+  priv->curframe    = frame;
+  priv->curinterval = le32toh(ctrl->dwframeinterval);
+  priv->maxframesize = maxframe;
+  priv->maxpayload  = maxpayload;
+
+  usbhost_uvc_selectalt(priv);
+
+  uinfo("Negotiated %s %dx%d at %" PRIu32 " fps: frame %" PRIu32 " bytes, "
+        "payload %" PRIu32 " bytes, alt %d (%d bytes per microframe)\n",
+        fmt->subtype == UVC_VS_FORMAT_MJPEG ? "MJPEG" : "uncompressed",
+        frame->width, frame->height,
+        priv->curinterval ? 10000000ul / priv->curinterval : 0,
+        priv->maxframesize, priv->maxpayload, priv->curalt,
+        priv->curpktsize);
+
+  return OK;
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_selectalt
+ *
+ * Description:
+ *   Choose the alternate setting to stream on.  Alternate settings of a
+ *   streaming interface differ only in how much isochronous bandwidth their
+ *   endpoint reserves, and the bus grants that bandwidth for as long as the
+ *   setting is selected.  Take the cheapest setting that can still carry the
+ *   negotiated payload, so that the camera does not hold bandwidth it will
+ *   not use and other devices can still be enumerated.
+ *
+ *   A bulk streaming endpoint has no alternate settings to choose between.
+ *
+ ****************************************************************************/
+
+static void usbhost_uvc_selectalt(FAR struct uvc_state_s *priv)
+{
+  uint32_t needed;
+  int best = -1;
+  int i;
+
+  if (priv->eptype != USB_EP_ATTR_XFER_ISOC)
+    {
+      priv->curalt     = priv->nalts > 0 ? priv->alts[0].alt : 0;
+      priv->curpktsize = priv->nalts > 0 ? priv->alts[0].pktsize : 0;
+      return;
+    }
+
+  /* dwMaxPayloadTransferSize is what the camera wants to move in one
+   * microframe, so it is directly comparable with wMaxPacketSize.
+   */
+
+  needed = priv->maxpayload;
+
+  for (i = 0; i < priv->nalts; i++)
+    {
+      if (priv->alts[i].pktsize >= needed &&
+          (best < 0 || priv->alts[i].pktsize < priv->alts[best].pktsize))
+        {
+          best = i;
+        }
+    }
+
+  if (best < 0)
+    {
+      /* Nothing is big enough.  Take the largest and let the camera split
+       * the payload across microframes, which the payload header allows.
+       */
+
+      for (i = 0; i < priv->nalts; i++)
+        {
+          if (best < 0 || priv->alts[i].pktsize > priv->alts[best].pktsize)
+            {
+              best = i;
+            }
+        }
+
+      uwarn("WARNING: No alternate setting carries %" PRIu32 " bytes, "
+            "using the largest\n", needed);
+    }
+
+  priv->curalt     = priv->alts[best].alt;
+  priv->curpktsize = priv->alts[best].pktsize;
+}
+
+/****************************************************************************
+ * Name: usbhost_uvc_defaults
+ *
+ * Description:
+ *   Choose the format and frame size to use when the application has not
+ *   asked for anything in particular.  The camera names a default frame for
+ *   each format, and the format preference is a configuration choice:
+ *   MJPEG costs far less bandwidth, uncompressed needs no decoder.
+ *
+ ****************************************************************************/
+
+static void usbhost_uvc_defaults(FAR struct uvc_state_s *priv,
+                                 FAR struct uvc_formatinfo_s **fmt,
+                                 FAR struct uvc_frameinfo_s **frame)
+{
+  FAR struct uvc_formatinfo_s *chosen = &priv->formats[0];
+  int i;
+  int j;
+
+  for (i = 0; i < priv->nformats; i++)
+    {
+      bool mjpeg = priv->formats[i].subtype == UVC_VS_FORMAT_MJPEG;
+
+#ifdef CONFIG_USBHOST_UVC_PREFER_MJPEG
+      if (mjpeg)
+#else
+      if (!mjpeg)
+#endif
+        {
+          chosen = &priv->formats[i];
+          break;
+        }
+    }
+
+  *fmt   = chosen;
+  *frame = &chosen->frames[0];
+
+  for (j = 0; j < chosen->nframes; j++)
+    {
+      if (chosen->frames[j].index == chosen->defframe)
+        {
+          *frame = &chosen->frames[j];
+          break;
+        }
+    }
+}
+
+/****************************************************************************
  * Name: usbhost_uvc_report
  *
  * Description:
@@ -829,6 +1263,7 @@ static void usbhost_uvc_destroy(FAR void *arg)
 
   uinfo("crefs: %d\n", priv->crefs);
 
+  usbhost_uvc_freebuffers(priv);
   usbhost_uvc_freeformats(priv);
   nxmutex_destroy(&priv->lock);
 
@@ -888,6 +1323,8 @@ static int usbhost_uvc_connect(FAR struct usbhost_class_s *usbclass,
                                FAR const uint8_t *configdesc, int desclen)
 {
   FAR struct uvc_state_s *priv = (FAR struct uvc_state_s *)usbclass;
+  FAR struct uvc_formatinfo_s *fmt;
+  FAR struct uvc_frameinfo_s *frame;
   int ret;
 
   DEBUGASSERT(priv != NULL && configdesc != NULL &&
@@ -901,6 +1338,29 @@ static int usbhost_uvc_connect(FAR struct usbhost_class_s *usbclass,
     }
 
   usbhost_uvc_report(priv);
+
+  ret = usbhost_uvc_allocbuffers(priv);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  /* Probe the default configuration now, without committing it.  This
+   * settles the frame and payload sizes the driver will have to buffer, and
+   * it establishes at bind time, rather than at the first capture, that the
+   * camera and the driver can agree on something at all.
+   */
+
+  usbhost_uvc_defaults(priv, &fmt, &frame);
+
+  ret = usbhost_uvc_negotiate(priv, fmt, frame, frame->definterval, false);
+  if (ret < 0)
+    {
+      uerr("ERROR: The camera accepted no default configuration: %d\n",
+           ret);
+      return ret;
+    }
+
   return OK;
 }
 
