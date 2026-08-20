@@ -51,6 +51,68 @@ config USBHOST_ASYNCH
 		I/O transfer.  This may be required, for example, to receive
 		infrequent, asynchronous input from an interrupt pipe.
 
+config USBHOST_UVC
+	bool "USB Video Class (UVC) webcam support"
+	default n
+	depends on !USBHOST_ISOC_DISABLE
+	select USBHOST_ASYNCH
+	select DRIVERS_VIDEO
+	select VIDEO_STREAM
+	---help---
+		Enable a USB host class driver for USB Video Class devices, that is,
+		ordinary USB webcams.  The camera is published through the standard
+		video capture framework as /dev/videoN and can be used by any
+		application that speaks V4L2, nxcamera among them.
+
+		The driver parses the camera's descriptors, negotiates a format with
+		the UVC probe and commit sequence, and reassembles frames from the
+		streaming endpoint.  MJPEG frames are passed through compressed; they
+		are never decoded inside the driver.
+
+		Streaming needs isochronous transfers, which most webcams offer
+		exclusively, so the host controller driver must implement
+		DRVR_ISOCASYNCH().  Cameras that additionally offer a bulk streaming
+		endpoint work without it.
+
+if USBHOST_UVC
+
+config USBHOST_UVC_NREQS
+	int "Number of streaming transfers in flight"
+	default 4
+	range 2 16
+	---help---
+		How many transfers the driver keeps queued on the streaming
+		endpoint.  Each is resubmitted as soon as it completes, so this is
+		how much of the stream can be buffered while the driver is busy
+		elsewhere.  Too few and packets are lost between transfers, which
+		shows up as torn frames; each one costs
+		USBHOST_UVC_NPACKETS * (packet size) bytes of memory.
+
+config USBHOST_UVC_NPACKETS
+	int "Isochronous packets per transfer"
+	default 32
+	range 1 128
+	---help---
+		How many isochronous packets each streaming transfer covers.  A high
+		speed endpoint delivers one packet every 125us, so the default of 32
+		covers 4ms of stream per transfer.
+
+config USBHOST_UVC_PREFER_MJPEG
+	bool "Prefer MJPEG over uncompressed"
+	default n
+	---help---
+		Choose MJPEG as the default format when the camera offers both.
+		MJPEG needs far less USB bandwidth and so reaches higher frame rates
+		and resolutions, and the driver passes it through without decoding
+		it.
+
+		The default is uncompressed, because a consumer that renders frames
+		itself needs a JPEG decoder to display MJPEG, and nxcamera's libyuv
+		conversion is not built with one.  Enable this if your application
+		can consume JPEG, or if it only stores or forwards the frames.
+
+endif # USBHOST_UVC
+
 config USBHOST_CONFIGURATION_SELECTION
 	bool "Per device configuration selection"
 	default n

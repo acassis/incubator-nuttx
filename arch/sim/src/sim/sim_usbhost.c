@@ -872,6 +872,18 @@ int sim_usbhost_initialize(void)
 
 #ifdef CONFIG_USBHOST_CDCACM
   ret = usbhost_cdcacm_initialize();
+  if (ret < 0)
+    {
+      uerr("ERROR: usbhost_cdcacm_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_USBHOST_UVC
+  ret = usbhost_uvc_initialize();
+  if (ret < 0)
+    {
+      uerr("ERROR: usbhost_uvc_initialize failed: %d\n", ret);
+    }
 #endif
 
   /* Initialize the device operations */

@@ -569,8 +569,8 @@
  *   other transfer types, the individual packet boundaries carry meaning to
  *   the class driver and cannot be recovered from a single byte count: a
  *   packet may be short or empty, and protocols layered on isochronous
- *   endpoints, USB Video Class among them, put a header at the start of every
- *   packet.  The transfer therefore reports the length of each packet
+ *   endpoints, USB Video Class among them, put a header at the start of
+ *   every packet.  The transfer therefore reports the length of each packet
  *   separately, in isoc->pktlen[].  Packet i occupies
  *   isoc->buffer[i * isoc->pktsize] and is isoc->pktlen[i] bytes long.
  *
@@ -1222,6 +1222,27 @@ void usbhost_msc_notifier_signal(uint8_t event, char sdchar);
  ****************************************************************************/
 
 int usbhost_cdcacm_initialize(void);
+#endif
+
+#ifdef CONFIG_USBHOST_UVC
+/****************************************************************************
+ * Name: usbhost_uvc_initialize
+ *
+ * Description:
+ *   Initialize the USB host USB Video Class driver.  This function should be
+ *   called by platform-specific code in order to initialize and register
+ *   support for USB webcams.
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   On success this function will return zero (OK);  A negated errno value
+ *   will be returned on failure.
+ *
+ ****************************************************************************/
+
+int usbhost_uvc_initialize(void);
 #endif
 
 #ifdef CONFIG_USBHOST_CDCECM
