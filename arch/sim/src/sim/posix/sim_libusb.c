@@ -76,6 +76,7 @@
 #endif
 
 #define HOST_LIBUSB_FIFO_NUM    8
+#define HOST_LIBUSB_MAX_IFACES  32
 
 #define HOST_LIBUSB_FIFO_USED(fifo) \
   ((fifo)->write - (fifo)->read)
@@ -105,6 +106,8 @@ struct host_libusb_hostdev_s
   struct host_libusb_fifo_s         completed;
   pthread_t                         handle_thread;
   bool                              connected;
+  bool                              claimed[HOST_LIBUSB_MAX_IFACES];
+  uint8_t                           nifaces;
 };
 
 /****************************************************************************
@@ -205,10 +208,17 @@ static void host_libusb_ep0transfer_cb(struct libusb_transfer *transfer)
     {
       datareq->success = true;
       datareq->xfer += transfer->actual_length;
-      memcpy(datareq->data, buffer, transfer->actual_length);
+
+      /* Only a device-to-host transfer has anything to hand back */
+
+      if ((transfer->buffer[0] & USB_DIR_IN) != 0 && datareq->data != NULL)
+        {
+          memcpy(datareq->data, buffer, transfer->actual_length);
+        }
     }
   else
     {
+      DEBUG("control transfer failed: %d", transfer->status);
       datareq->success = false;
     }
 
@@ -336,7 +346,7 @@ static void host_libusb_isotransfer_cb(struct libusb_transfer *transfer)
 }
 #endif
 
-static int host_libusb_ep0inhandle(struct host_libusb_hostdev_s *dev,
+static int host_libusb_ep0transfer(struct host_libusb_hostdev_s *dev,
                                    struct usb_ctrlrequest *ctrlreq,
                                    struct host_usb_datareq_s *datareq,
                                    int timeout)
@@ -347,7 +357,7 @@ static int host_libusb_ep0inhandle(struct host_libusb_hostdev_s *dev,
 
   if (!dev->handle)
     {
-      ERROR("host_libusb_ep0inhandle() fail: %s\n",
+      ERROR("host_libusb_ep0transfer() fail: %s\n",
             host_uninterruptible(libusb_strerror, LIBUSB_ERROR_NO_DEVICE));
       return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -358,6 +368,20 @@ static int host_libusb_ep0inhandle(struct host_libusb_hostdev_s *dev,
       ERROR("control data buffer malloc() fail: %s\n",
             host_uninterruptible(libusb_strerror, LIBUSB_ERROR_NO_MEM));
       return LIBUSB_ERROR_NO_MEM;
+    }
+
+  /* For a host-to-device request the payload travels with the setup packet */
+
+  if ((ctrlreq->bRequestType & USB_DIR_IN) == 0 && ctrlreq->wLength > 0)
+    {
+      if (datareq->data == NULL)
+        {
+          free(buffer);
+          return LIBUSB_ERROR_INVALID_PARAM;
+        }
+
+      memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, datareq->data,
+             ctrlreq->wLength);
     }
 
   transfer = host_uninterruptible(libusb_alloc_transfer, 0);
@@ -395,44 +419,177 @@ err_with_buffer:
   return ret;
 }
 
+/****************************************************************************
+ * Name: host_libusb_releaseifaces
+ *
+ * Description:
+ *   Give every claimed interface back to the Linux kernel.  Because
+ *   auto-detach is enabled on the handle, releasing an interface also
+ *   re-attaches whatever kernel driver (uvcvideo, for a webcam) owned it
+ *   before NuttX took it, so the host device returns to normal operation.
+ *
+ ****************************************************************************/
+
+static void host_libusb_releaseifaces(struct host_libusb_hostdev_s *dev)
+{
+  uint8_t i;
+
+  if (dev->handle == NULL)
+    {
+      return;
+    }
+
+  for (i = 0; i < HOST_LIBUSB_MAX_IFACES; i++)
+    {
+      if (dev->claimed[i])
+        {
+          host_uninterruptible(libusb_release_interface, dev->handle, i);
+          dev->claimed[i] = false;
+        }
+    }
+
+  dev->nifaces = 0;
+}
+
+/****************************************************************************
+ * Name: host_libusb_claimifaces
+ *
+ * Description:
+ *   Claim every interface of the active configuration.  NuttX enumerates the
+ *   whole device and its class drivers may use any interface, so ownership
+ *   is taken for all of them at SET_CONFIGURATION time.  Auto-detach makes
+ *   each claim detach the kernel driver bound to that interface only; no
+ *   kernel module is unloaded and no other USB device is affected.
+ *
+ ****************************************************************************/
+
+static int host_libusb_claimifaces(struct host_libusb_hostdev_s *dev)
+{
+  struct libusb_config_descriptor *config;
+  int ret;
+  int i;
+
+  ret = host_uninterruptible(libusb_get_active_config_descriptor,
+                             dev->priv, &config);
+  if (ret != LIBUSB_SUCCESS)
+    {
+      ERROR("libusb_get_active_config_descriptor() failed: %s",
+            host_uninterruptible(libusb_strerror, ret));
+      return ret;
+    }
+
+  dev->nifaces = config->bNumInterfaces < HOST_LIBUSB_MAX_IFACES ?
+                 config->bNumInterfaces : HOST_LIBUSB_MAX_IFACES;
+
+  for (i = 0; i < dev->nifaces; i++)
+    {
+      uint8_t ifno = config->interface[i].altsetting[0].bInterfaceNumber;
+
+      ret = host_uninterruptible(libusb_claim_interface, dev->handle, ifno);
+      if (ret != LIBUSB_SUCCESS)
+        {
+          ERROR("Cannot claim interface %d: %s.  Is another process or a "
+                "kernel driver still using it?", ifno,
+                host_uninterruptible(libusb_strerror, ret));
+          goto errout;
+        }
+
+      dev->claimed[ifno] = true;
+    }
+
+  host_uninterruptible_no_return(libusb_free_config_descriptor, config);
+  return LIBUSB_SUCCESS;
+
+errout:
+  host_uninterruptible_no_return(libusb_free_config_descriptor, config);
+  host_libusb_releaseifaces(dev);
+  return ret;
+}
+
+/****************************************************************************
+ * Name: host_libusb_ep0outhandle
+ *
+ * Description:
+ *   Handle a host-to-device request on endpoint 0.  Standard requests that
+ *   change the device state that libusb tracks (SET_CONFIGURATION,
+ *   SET_INTERFACE) must go through the libusb API rather than be sent as raw
+ *   control transfers, so that libusb and the kernel stay in step with the
+ *   device.  These are the only requests handled here; every request with a
+ *   data stage, in particular the class requests carrying the UVC probe and
+ *   commit payloads, is submitted as an ordinary control transfer by
+ *   host_usbhost_ep0trans().
+ *
+ ****************************************************************************/
+
 static int host_libusb_ep0outhandle(struct host_libusb_hostdev_s *dev,
                                     struct usb_ctrlrequest *ctrlreq)
 {
   int ret = LIBUSB_SUCCESS;
+  int current;
 
   if (!dev->handle)
     {
-      ERROR("host_libusb_control_request() fail: %s\n",
+      ERROR("host_libusb_ep0outhandle() fail: %s\n",
             host_uninterruptible(libusb_strerror, LIBUSB_ERROR_NO_DEVICE));
       return LIBUSB_ERROR_NO_DEVICE;
-    }
-
-  if ((ctrlreq->bRequestType & USB_TYPE_MASK) !=
-      USB_TYPE_STANDARD)
-    {
-      return ret;
     }
 
   switch (ctrlreq->bRequest)
     {
       case USB_REQ_SET_CONFIGURATION:
-        ret = host_uninterruptible(libusb_detach_kernel_driver,
-                                   dev->handle, 0);
-        if (ret == LIBUSB_SUCCESS)
+
+        /* Selecting the configuration the device is already in would tear
+         * down and rebuild every kernel-side endpoint for nothing, and it
+         * fails outright while any interface still has a kernel driver
+         * attached.  Only switch when the device is really in another
+         * configuration.
+         */
+
+        host_libusb_releaseifaces(dev);
+
+        current = 0;
+        ret = host_uninterruptible(libusb_get_configuration, dev->handle,
+                                   &current);
+        if (ret != LIBUSB_SUCCESS)
+          {
+            ERROR("libusb_get_configuration() failed: %s",
+                  host_uninterruptible(libusb_strerror, ret));
+            break;
+          }
+
+        if (current != ctrlreq->wValue)
           {
             ret = host_uninterruptible(libusb_set_configuration,
-                                       dev->handle,
-                                       ctrlreq->wValue);
-            ret |= host_uninterruptible(libusb_claim_interface,
-                                        dev->handle, 0);
+                                       dev->handle, ctrlreq->wValue);
+            if (ret != LIBUSB_SUCCESS)
+              {
+                ERROR("libusb_set_configuration(%d) failed: %s",
+                      ctrlreq->wValue,
+                      host_uninterruptible(libusb_strerror, ret));
+                break;
+              }
           }
-        else if (ret == LIBUSB_ERROR_NOT_FOUND)
+
+        ret = host_libusb_claimifaces(dev);
+        break;
+
+      case USB_REQ_SET_INTERFACE:
+
+        /* Alternate setting selection.  This is how a UVC host asks for
+         * isochronous bandwidth, so it must reach the device.
+         */
+
+        ret = host_uninterruptible(libusb_set_interface_alt_setting,
+                                   dev->handle, ctrlreq->wIndex,
+                                   ctrlreq->wValue);
+        if (ret != LIBUSB_SUCCESS)
           {
-            return LIBUSB_SUCCESS;
+            ERROR("libusb_set_interface_alt_setting(%d, %d) failed: %s",
+                  ctrlreq->wIndex, ctrlreq->wValue,
+                  host_uninterruptible(libusb_strerror, ret));
           }
         break;
-      case USB_REQ_SET_INTERFACE: /* TODO */
-        break;
+
       default:
         break;
     }
@@ -788,16 +945,21 @@ int host_usbhost_ep0trans(struct host_usb_ctrlreq_s *ctrlreq,
 
   host_libusb_getctrlreq(&libusb_ctrlreq, ctrlreq);
 
-  if (!(libusb_ctrlreq.bRequestType & USB_DIR_IN))
+  /* Standard host-to-device requests that change state libusb tracks are
+   * translated into libusb calls and complete immediately.  Everything else
+   * is a real control transfer and completes asynchronously.
+   */
+
+  if ((libusb_ctrlreq.bRequestType & USB_DIR_IN) == 0 &&
+      (libusb_ctrlreq.bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD)
     {
       ret = host_libusb_ep0outhandle(dev, &libusb_ctrlreq);
-      datareq->success = (ret != LIBUSB_SUCCESS) ? false : true;
+      datareq->success = (ret == LIBUSB_SUCCESS);
       host_libusb_fifopush(&dev->completed, datareq);
     }
   else
     {
-      ret = host_libusb_ep0inhandle(dev, &libusb_ctrlreq,
-                                    datareq, 0);
+      ret = host_libusb_ep0transfer(dev, &libusb_ctrlreq, datareq, 0);
       if (ret != LIBUSB_SUCCESS)
         {
           datareq->success = false;
@@ -909,6 +1071,12 @@ err_out:
 void host_usbhost_close(void)
 {
   struct host_libusb_hostdev_s *dev = &g_libusb_dev;
+
+  /* Hand every interface back to the kernel before dropping the handle, so
+   * that the webcam becomes an ordinary Linux camera again.
+   */
+
+  host_libusb_releaseifaces(dev);
 
   dev->priv = NULL;
 
