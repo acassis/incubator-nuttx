@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <linux/usb/ch9.h>
 #include <libusb-1.0/libusb.h>
@@ -953,6 +954,33 @@ static void host_libusb_atexit(void)
 }
 
 /****************************************************************************
+ * Name: host_libusb_signal
+ *
+ * Description:
+ *   Terminating on a signal does not run atexit handlers, so a simulator
+ *   stopped with Ctrl-C or killed with the default signal would leave the
+ *   device unbound.  Catch the signals that can be caught, clean up, and
+ *   then let the signal take its normal course so that the exit status
+ *   still reflects it.
+ *
+ *   The cleanup is not async-signal-safe, strictly speaking.  It is done
+ *   anyway because the process is on its way out and the alternative is to
+ *   leave the user's webcam unusable until it is replugged, which for a
+ *   built-in camera means a reboot.  SIGKILL cannot be caught at all; the
+ *   recovery there is to start the simulator once more and exit it
+ *   normally.
+ *
+ ****************************************************************************/
+
+static void host_libusb_signal(int signo)
+{
+  host_usbhost_close();
+
+  signal(signo, SIG_DFL);
+  raise(signo);
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -1190,6 +1218,10 @@ int host_usbhost_init(void)
     }
 
   host_uninterruptible(atexit, host_libusb_atexit);
+
+  signal(SIGINT, host_libusb_signal);
+  signal(SIGTERM, host_libusb_signal);
+  signal(SIGHUP, host_libusb_signal);
 
   g_libusb_dev.connected = host_libusb_connectdevice();
 
