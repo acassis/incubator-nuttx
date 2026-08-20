@@ -432,14 +432,23 @@ err_with_buffer:
 
 static void host_libusb_releaseifaces(struct host_libusb_hostdev_s *dev)
 {
-  uint8_t i;
+  int i;
 
   if (dev->handle == NULL)
     {
       return;
     }
 
-  for (i = 0; i < HOST_LIBUSB_MAX_IFACES; i++)
+  /* Release in descending interface order.  A kernel driver that spans
+   * several interfaces, such as uvcvideo over a VideoControl and a
+   * VideoStreaming interface, is offered the function's first interface and
+   * then claims the rest itself.  Releasing upwards would offer it interface
+   * 0 while the interfaces it still needs are ours, and it would refuse to
+   * bind; releasing downwards leaves the whole function free by the time its
+   * first interface is handed back.
+   */
+
+  for (i = HOST_LIBUSB_MAX_IFACES - 1; i >= 0; i--)
     {
       if (dev->claimed[i])
         {
@@ -902,6 +911,26 @@ static int host_libusb_hotplug_callback(libusb_context *ctx,
 }
 
 /****************************************************************************
+ * Name: host_libusb_atexit
+ *
+ * Description:
+ *   Give the device back to Linux when the simulator terminates.  Without
+ *   this, an interface whose kernel driver was detached so that NuttX could
+ *   claim it stays unbound after the simulator is gone: a webcam would
+ *   disappear from the host's video devices until it is replugged.
+ *
+ *   This runs on the normal exit paths, which includes 'poweroff' from NSH.
+ *   A simulator killed outright cannot run it, and the recovery in that case
+ *   is documented with the driver.
+ *
+ ****************************************************************************/
+
+static void host_libusb_atexit(void)
+{
+  host_usbhost_close();
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -1137,6 +1166,8 @@ int host_usbhost_init(void)
             host_uninterruptible(libusb_strerror, ret));
       return ret;
     }
+
+  host_uninterruptible(atexit, host_libusb_atexit);
 
   g_libusb_dev.connected = host_libusb_connectdevice();
 
