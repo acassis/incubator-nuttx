@@ -1075,8 +1075,24 @@ int host_usbhost_eptrans(struct host_usb_datareq_s *datareq)
 
   if (ret != LIBUSB_SUCCESS)
     {
+      /* The request was never handed to libusb, so it never completes.  The
+       * caller is told synchronously and keeps ownership of it; queueing it
+       * as a completion as well would have the caller free it and the work
+       * queue then run its callback on freed memory.
+       */
+
       datareq->success = false;
-      host_libusb_fifopush(&dev->completed, datareq);
+
+      /* A device that has gone away is a disconnect, not a transfer error.
+       * Report it as one so that the class driver is told the device is
+       * gone instead of retrying against nothing.
+       */
+
+      if (ret == LIBUSB_ERROR_NO_DEVICE || ret == LIBUSB_ERROR_NOT_FOUND)
+        {
+          INFO("Device no longer responding, treating as a disconnect");
+          dev->connected = false;
+        }
     }
 
   return ret;
