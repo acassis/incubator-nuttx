@@ -74,3 +74,10 @@ endif
 
 CMN_ASRCS += fork.S
 
+
+# Morse Micro Wi-Fi HaLow host library (pre-built, Cortex-M only)
+
+ifeq ($(CONFIG_IEEE80211_MORSE),y)
+  include $(TOPDIR)$(DELIM)drivers$(DELIM)wireless$(DELIM)ieee80211$(DELIM)morse$(DELIM)Sdk.mk
+  EXTRA_LIBS += $(MORSE_LIB)
+endif
